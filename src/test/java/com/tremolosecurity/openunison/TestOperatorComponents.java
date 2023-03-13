@@ -13,6 +13,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import com.tremolosecurity.openunison.crd.OpenUnison;
+import com.tremolosecurity.openunison.crd.OpenUnisonSpecKeyStoreStaticKeysInner;
 import com.tremolosecurity.openunison.kubernetes.ClusterConnection;
 import com.tremolosecurity.openunison.obj.WsResponse;
 import com.tremolosecurity.openunison.secret.Generator;
@@ -39,6 +41,74 @@ public class TestOperatorComponents {
         cluster = cluster = new ClusterConnection(System.getenv("API_SERVER_URL"),"openunison",System.getenv("PATH_TO_CA_CRT"),System.getenv("PATH_TO_TOKEN"),new String[]{"2","3","4","5","6","7"});
     }
 
+    @Test
+    public void testStaticSecretCreateNew() throws Exception {
+        // delete the static secret and make sure it gets created
+        com.tremolosecurity.openunison.crd.OpenUnison ou = loadOrchestra();
+
+        // delete secret
+        cluster.delete("/api/v1/namespaces/openunison/secrets/orchestra-static-keys");
+
+        // make sure it's not still there
+        WsResponse resp = cluster.get("/api/v1/namespaces/openunison/secrets/orchestra-static-keys");
+        assertEquals(404,resp.getResult());
+
+        Generator gensecret = new Generator();
+        gensecret.load(ou,cluster,"openunison","orchestra");
+
+        System.out.println("Sleeping for 3 seconds");
+        Thread.sleep(3000);
+
+        resp = cluster.get("/api/v1/namespaces/openunison/secrets/orchestra-static-keys");
+        assertEquals(200,resp.getResult());
+    }
+
+    private String getKey(String b64secret) throws ParseException {
+        String json = new String(Base64.getDecoder().decode(b64secret));
+        JSONObject obj = (JSONObject) new JSONParser().parse(json);
+        return (String) obj.get("key_data");
+    }
+
+    private int getVersion(String b64secret) throws ParseException {
+        String json = new String(Base64.getDecoder().decode(b64secret));
+        JSONObject obj = (JSONObject) new JSONParser().parse(json);
+        return ((Long) obj.get("version")).intValue();
+    }
+
+    @Test
+    public void testStaticPatchNewVersion() throws Exception {
+        // delete the static secret and make sure it gets created
+        com.tremolosecurity.openunison.crd.OpenUnison ou = loadOrchestra();
+
+        // make sure the Secret is still there
+        WsResponse resp = cluster.get("/api/v1/namespaces/openunison/secrets/orchestra-static-keys");
+        assertEquals(200,resp.getResult());
+
+        String curKey = getKey((String)((JSONObject)resp.getBody().get("data")).get("session-unison"));
+        int curVersion = getVersion((String)((JSONObject)resp.getBody().get("data")).get("session-unison"));
+        String curLastMileKey = getKey((String)((JSONObject)resp.getBody().get("data")).get("lastmile-oidc"));
+        // make sure the current key verison is "1"
+        for  (OpenUnisonSpecKeyStoreStaticKeysInner key : ou.getSpec().getKeyStore().getStaticKeys()) {
+            if (key.getName().equals("session-unison")) {
+                
+                key.setVersion(curVersion + 1);
+            }
+        }
+
+        Generator gensecret = new Generator();
+        gensecret.load(ou,cluster,"openunison","orchestra");
+
+        System.out.println("Sleeping for 3 seconds");
+        Thread.sleep(3000);
+
+        resp = cluster.get("/api/v1/namespaces/openunison/secrets/orchestra-static-keys");
+        assertEquals(200,resp.getResult());
+
+        String newKey = getKey((String)((JSONObject)resp.getBody().get("data")).get("session-unison"));
+        String newLastMileKey = getKey((String)((JSONObject)resp.getBody().get("data")).get("lastmile-oidc"));
+        assertNotEquals(newKey, curKey);
+        assertEquals(curLastMileKey,newLastMileKey);
+    }
 
     @Test
     public void testLoadObject() throws Exception {

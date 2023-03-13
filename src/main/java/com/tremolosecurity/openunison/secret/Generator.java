@@ -11,12 +11,15 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.spec.InvalidKeySpecException;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
 import com.tremolosecurity.openunison.crd.OpenUnison;
@@ -26,6 +29,7 @@ import com.tremolosecurity.openunison.crd.OpenUnisonSpecHostsInnerNamesInner;
 import com.tremolosecurity.openunison.crd.OpenUnisonSpecKeyStoreKeyPairsKeysInner;
 import com.tremolosecurity.openunison.crd.OpenUnisonSpecKeyStoreKeyPairsKeysInnerCreateData;
 import com.tremolosecurity.openunison.crd.OpenUnisonSpecKeyStoreKeyPairsKeysInnerCreateDataSecretInfo;
+import com.tremolosecurity.openunison.crd.OpenUnisonSpecKeyStoreStaticKeysInner;
 import com.tremolosecurity.openunison.crd.OpenUnisonSpecKeyStoreTrustedCertificatesInner;
 import com.tremolosecurity.openunison.crd.OpenUnisonSpecKeyStoreKeyPairsKeysInner.ImportIntoKsEnum;
 import com.tremolosecurity.openunison.kubernetes.ClusterConnection;
@@ -60,6 +64,131 @@ public class Generator {
         this.loadPropertiesFromCrd();
         this.loadPropertiesFromSecret();
         this.generateKeyStore();
+        this.generateStaticKeys();
+    }
+
+    private void generateStaticKeys() throws Exception {
+        String ksPassword = this.props.get("unisonKeystorePassword");
+        boolean skipWriteToSecret = this.props.get("openunison.static-secret.skip_write") != null && this.props.get("openunison.static-secret.skip_write").equals("true");
+        String secretSuffix = this.props.get("openunison.static-secret.suffix");
+
+        if (secretSuffix == null) {
+            secretSuffix = "";
+        }
+
+
+        String secretURI = "/api/v1/namespaces/" + this.namespace + "/secrets/" + this.name + "-static-keys" + secretSuffix;
+        System.out.println("Loading static Secrets from " + secretURI);
+        WsResponse resp = this.cluster.get(secretURI);
+        Map<String,JSONObject> staticKeys = new HashMap<String,JSONObject>();
+        JSONObject dataPatch = new JSONObject();
+
+        boolean createSecret = true;
+
+        if (resp.getResult() != 200) {
+            System.out.println("Could not load Secret: " + resp.getBody() + ", creating");
+            
+        } else {
+            createSecret = false;
+            for (Object key : ((JSONObject)resp.getBody().get("data")).keySet()) {
+                String keyData = (String) ((JSONObject)resp.getBody().get("data")).get(key);
+                
+                if (keyData != null) {
+                    JSONObject staticKey = (JSONObject) new JSONParser().parse(new String(java.util.Base64.getDecoder().decode(keyData)));
+                    staticKey.put("still_used", false);
+                    staticKeys.put((String) key, staticKey);
+                    
+                }
+            }
+            
+        }
+
+        List<String> tokeep = new ArrayList<String>();
+        for (OpenUnisonSpecKeyStoreStaticKeysInner staticKey : this.ou.getSpec().getKeyStore().getStaticKeys()) {
+            JSONObject staticKeyFromAPI = staticKeys.get(staticKey.getName());
+            tokeep.add(staticKey.getName());
+            System.out.println("Checking static key " + staticKey.getName());
+
+            if (staticKeyFromAPI == null) {
+                System.out.println("the static key doesn't exist in the secret, create it");
+                CertUtils.createKey(ouKs, staticKey.getName(), ksPassword );
+                JSONObject keyObj = new JSONObject();
+                dataPatch.put(staticKey.getName(), keyObj);
+
+                keyObj.put("name", staticKey.getName());
+                keyObj.put("version",1);
+                keyObj.put("key_data",CertUtils.exportKey(ouKs, staticKey.getName(), ksPassword));
+                keyObj.put("still_used",true);
+            } else if (staticKey.getVersion().intValue() != ((Long)staticKeyFromAPI.get("version")).intValue()) {
+                System.out.println("the static key version changed from " +  ((Long)staticKeyFromAPI.get("version")).intValue() + " to " + staticKey.getVersion().intValue()  + ",recreating");
+                CertUtils.createKey(ouKs, staticKey.getName(), ksPassword );
+                JSONObject keyObj = new JSONObject();
+                dataPatch.put(staticKey.getName(), keyObj);
+
+                keyObj.put("name", staticKey.getName());
+                keyObj.put("version",staticKey.getVersion().intValue());
+                keyObj.put("key_data",CertUtils.exportKey(ouKs, staticKey.getName(), ksPassword));
+                keyObj.put("still_used",true);
+            } else {
+                System.out.println("Keeping unchanged");
+                dataPatch.put(staticKey.getName(), staticKeyFromAPI);
+            }
+
+        }
+
+        for (String key : tokeep) {
+            staticKeys.remove(key);
+        }
+
+        if (! createSecret) {
+            for (String staticKeyToDelete : staticKeys.keySet()) {
+                System.out.println("Deleting " + staticKeyToDelete);
+                dataPatch.put(staticKeyToDelete, null);
+            }
+        }
+
+        for (Object key : dataPatch.keySet()) {
+            JSONObject obj = (JSONObject) dataPatch.get(key);
+            if (obj != null) {
+                String jsonstring = obj.toJSONString();
+                dataPatch.put(key, Base64.getEncoder().encodeToString(jsonstring.getBytes("UTF-8")));
+            }
+        }
+
+        if (! skipWriteToSecret) {
+
+            if (createSecret) {
+                System.out.println("Creating a new Secret");
+                JSONObject secret = new JSONObject();
+                secret.put("apiVersion","v1");
+                secret.put("kind","Secret");
+                secret.put("type","Opaque");
+                JSONObject metadata = new JSONObject();
+                secret.put("metadata",metadata);
+                metadata.put("name",this.name + "-static-keys" + secretSuffix);
+                metadata.put("namespace",this.namespace);
+                secret.put("data", dataPatch);
+
+                resp = cluster.post( "/api/v1/namespaces/" + this.namespace + "/secrets", secret.toJSONString());
+                if (resp.getResult() < 200 || resp.getResult() > 299) {
+                    throw new Exception("Could not write static secret : " + resp.getResult() + " / " + resp.getBody().toJSONString());
+                }
+            } else {
+                System.out.println("Writing Secret to " + secretURI);
+                JSONObject data = new JSONObject();
+                data.put("data", dataPatch);
+                resp = cluster.patch(secretURI, data.toJSONString());
+                if (resp.getResult() < 200 || resp.getResult() > 299) {
+                    throw new Exception("Could not write static secret : " + resp.getResult() + " / " + resp.getBody().toJSONString());
+                }
+
+            }
+
+            
+        } else {
+            System.out.println("Writing secret disabled, skipping");
+        }
+
     }
 
     private void loadPropertiesFromCrd() throws Exception {
