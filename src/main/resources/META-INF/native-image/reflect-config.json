@@ -13,7 +13,15 @@
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
+  "name":"com.fasterxml.jackson.databind.ext.Java7SupportImpl",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
   "name":"com.sun.crypto.provider.AESCipher$General",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"com.sun.crypto.provider.AESKeyGenerator",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
@@ -57,6 +65,10 @@
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
+  "name":"com.sun.crypto.provider.PBES2Parameters$General",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
   "name":"com.sun.crypto.provider.PBES2Parameters$HmacSHA256AndAES_256",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
@@ -74,7 +86,11 @@
   "methods":[
     {"name":"<init>","parameterTypes":[] }, 
     {"name":"setup","parameterTypes":[] }, 
-    {"name":"testLoadObject","parameterTypes":[] }
+    {"name":"testLoadObject","parameterTypes":[] }, 
+    {"name":"testStaticAddNewSecret","parameterTypes":[] }, 
+    {"name":"testStaticDeleteRemovedSecret","parameterTypes":[] }, 
+    {"name":"testStaticPatchNewVersion","parameterTypes":[] }, 
+    {"name":"testStaticSecretCreateNew","parameterTypes":[] }
   ]
 },
 {
@@ -277,6 +293,9 @@
 },
 {
   "name":"java.sql.Date"
+},
+{
+  "name":"java.sql.Timestamp"
 },
 {
   "name":"java.util.Date"

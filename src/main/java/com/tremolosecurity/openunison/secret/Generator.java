@@ -1,27 +1,43 @@
 package com.tremolosecurity.openunison.secret;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.Certificate;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.joda.time.DateTime;
+import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
+import com.google.gson.GsonBuilder;
+import com.tremolosecurity.openunison.JSON;
 import com.tremolosecurity.openunison.crd.OpenUnison;
 import com.tremolosecurity.openunison.crd.OpenUnisonSpecHostsInner;
 import com.tremolosecurity.openunison.crd.OpenUnisonSpecHostsInnerAnnotationsInner;
@@ -38,6 +54,15 @@ import com.tremolosecurity.openunison.obj.WsResponse;
 import com.tremolosecurity.openunison.obj.X509Data;
 import com.tremolosecurity.openunison.util.CertUtils;
 import com.tremolosecurity.openunison.util.NetUtils;
+
+import io.k8s.JSON.ByteArrayAdapter;
+import io.k8s.JSON.DateTypeAdapter;
+import io.k8s.JSON.LocalDateTypeAdapter;
+import io.k8s.JSON.OffsetDateTimeTypeAdapter;
+import io.k8s.JSON.SqlDateTypeAdapter;
+import io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhook;
+import io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhookConfiguration;
+import io.k8s.obj.IoK8sApimachineryPkgApisMetaV1ObjectMeta;
 
 public class Generator {
     OpenUnison ou;
@@ -65,6 +90,73 @@ public class Generator {
         this.loadPropertiesFromSecret();
         this.generateKeyStore();
         this.generateStaticKeys();
+        this.generateOpenUnisonSecret();
+    }
+
+    private void generateOpenUnisonSecret() throws KeyStoreException, NoSuchAlgorithmException, CertificateException, FileNotFoundException, IOException, ParseException, InterruptedException, URISyntaxException {
+        
+        KeyStore trustStore = CertUtils.mergeCaCerts(this.ouKs);
+
+
+
+        io.k8s.obj.IoK8sApiCoreV1Secret secret = new io.k8s.obj.IoK8sApiCoreV1Secret();
+        secret.setData(new HashMap<String,byte[]>());
+
+        
+
+        
+
+        secret.getData().put("openunison.yaml",this.asYaml(this.ou.getSpec().getOpenunisonNetworkConfiguration().toJson()).getBytes("UTF-8"));
+        secret.getData().put("ou.env",this.b64EncodeProps());
+        secret.getData().put("unisonKeyStore.p12",CertUtils.encodeKeyStoreToBytes(this.ouKs, this.props.get("unisonKeystorePassword")));
+        secret.getData().put("cacerts.jks",CertUtils.encodeKeyStoreToBytes(trustStore, "changeit"));
+
+        WsResponse resp = this.cluster.getSecret(this.namespace, this.ou.getSpec().getDestSecret());
+
+        if (resp.getResult() == 200) {
+
+
+            secret.setMetadata(new IoK8sApimachineryPkgApisMetaV1ObjectMeta());
+            secret.getMetadata().setAnnotations(new HashMap<String,String>());
+            secret.getMetadata().getAnnotations().put("tremolo.io/last_updated",new DateTime().toString());
+
+
+            resp = cluster.patch("/api/v1/namespaces/" + namespace + "/secrets/" +  this.ou.getSpec().getDestSecret(), secret.toJson());
+            if (resp.getResult() != 200) {
+                System.out.println("Problem patching secret - " + resp.getResult() + " / " + resp.getBody().toJSONString());
+            } else {
+                System.out.println("Secret patched");
+            }
+        } else {
+
+            secret.setType("Opqaue");
+            secret.setApiVersion("v1");
+            secret.setKind("Secret");
+            secret.setMetadata(new IoK8sApimachineryPkgApisMetaV1ObjectMeta());
+            secret.getMetadata().setName(this.ou.getSpec().getDestSecret());
+            secret.getMetadata().setNamespace(this.namespace);
+            secret.getMetadata().setAnnotations(new HashMap<String,String>());
+            secret.getMetadata().getAnnotations().put("tremolo.io/last_updated",new DateTime().toString());
+
+            
+
+            resp = cluster.post("/api/v1/namespaces/" + namespace + "/secrets", secret.toJson());
+            if (resp.getResult() != 200) {
+                System.out.println("Problem patching secret - " + resp.getResult() + " / " + resp.getBody().toJSONString());
+            } else {
+                System.out.println("Secret patched");
+            }
+        }
+
+    }
+
+    private byte[] b64EncodeProps() throws UnsupportedEncodingException {
+        StringBuilder sb = new StringBuilder();
+        for (String key : this.props.keySet()) {
+            sb.append(key).append('=').append(this.props.get(key)).append('\n');
+        }
+
+        return sb.toString().getBytes("UTF-8");
     }
 
     private void generateStaticKeys() throws Exception {
@@ -80,8 +172,11 @@ public class Generator {
         String secretURI = "/api/v1/namespaces/" + this.namespace + "/secrets/" + this.name + "-static-keys" + secretSuffix;
         System.out.println("Loading static Secrets from " + secretURI);
         WsResponse resp = this.cluster.get(secretURI);
+
+        
+
         Map<String,JSONObject> staticKeys = new HashMap<String,JSONObject>();
-        JSONObject dataPatch = new JSONObject();
+        Map<String,byte[]> dataPatch = new HashMap<String,byte[]>();
 
         boolean createSecret = true;
 
@@ -89,12 +184,13 @@ public class Generator {
             System.out.println("Could not load Secret: " + resp.getBody() + ", creating");
             
         } else {
+            io.k8s.obj.IoK8sApiCoreV1Secret secretFromK8s = io.k8s.JSON.getGson().fromJson(resp.getBody().toString(), io.k8s.obj.IoK8sApiCoreV1Secret.class);
             createSecret = false;
-            for (Object key : ((JSONObject)resp.getBody().get("data")).keySet()) {
-                String keyData = (String) ((JSONObject)resp.getBody().get("data")).get(key);
+            for (String key : secretFromK8s.getData().keySet()) {
+                String keyData = new String(secretFromK8s.getData().get(key));
                 
                 if (keyData != null) {
-                    JSONObject staticKey = (JSONObject) new JSONParser().parse(new String(java.util.Base64.getDecoder().decode(keyData)));
+                    JSONObject staticKey = (JSONObject) new JSONParser().parse(keyData);
                     staticKey.put("still_used", false);
                     staticKeys.put((String) key, staticKey);
                     
@@ -113,25 +209,30 @@ public class Generator {
                 System.out.println("the static key doesn't exist in the secret, create it");
                 CertUtils.createKey(ouKs, staticKey.getName(), ksPassword );
                 JSONObject keyObj = new JSONObject();
-                dataPatch.put(staticKey.getName(), keyObj);
+                
 
                 keyObj.put("name", staticKey.getName());
                 keyObj.put("version",1);
                 keyObj.put("key_data",CertUtils.exportKey(ouKs, staticKey.getName(), ksPassword));
                 keyObj.put("still_used",true);
+
+                dataPatch.put(staticKey.getName(), keyObj.toString().getBytes("UTF-8"));
             } else if (staticKey.getVersion().intValue() != ((Long)staticKeyFromAPI.get("version")).intValue()) {
                 System.out.println("the static key version changed from " +  ((Long)staticKeyFromAPI.get("version")).intValue() + " to " + staticKey.getVersion().intValue()  + ",recreating");
                 CertUtils.createKey(ouKs, staticKey.getName(), ksPassword );
                 JSONObject keyObj = new JSONObject();
-                dataPatch.put(staticKey.getName(), keyObj);
+                
 
                 keyObj.put("name", staticKey.getName());
                 keyObj.put("version",staticKey.getVersion().intValue());
                 keyObj.put("key_data",CertUtils.exportKey(ouKs, staticKey.getName(), ksPassword));
                 keyObj.put("still_used",true);
+
+                dataPatch.put(staticKey.getName(), keyObj.toString().getBytes("UTF-8"));
             } else {
                 System.out.println("Keeping unchanged");
-                dataPatch.put(staticKey.getName(), staticKeyFromAPI);
+                dataPatch.put(staticKey.getName(), staticKeyFromAPI.toString().getBytes("UTF-8"));
+
             }
 
         }
@@ -147,37 +248,50 @@ public class Generator {
             }
         }
 
-        for (Object key : dataPatch.keySet()) {
-            JSONObject obj = (JSONObject) dataPatch.get(key);
-            if (obj != null) {
-                String jsonstring = obj.toJSONString();
-                dataPatch.put(key, Base64.getEncoder().encodeToString(jsonstring.getBytes("UTF-8")));
-            }
-        }
+        
 
         if (! skipWriteToSecret) {
 
             if (createSecret) {
                 System.out.println("Creating a new Secret");
-                JSONObject secret = new JSONObject();
-                secret.put("apiVersion","v1");
-                secret.put("kind","Secret");
-                secret.put("type","Opaque");
-                JSONObject metadata = new JSONObject();
-                secret.put("metadata",metadata);
-                metadata.put("name",this.name + "-static-keys" + secretSuffix);
-                metadata.put("namespace",this.namespace);
-                secret.put("data", dataPatch);
+                
+                io.k8s.obj.IoK8sApiCoreV1Secret secret = new io.k8s.obj.IoK8sApiCoreV1Secret();
+                secret.setType("Opqaue");
+                secret.setApiVersion("v1");
+                secret.setKind("Secret");
+                secret.setMetadata(new IoK8sApimachineryPkgApisMetaV1ObjectMeta());
+                secret.getMetadata().setName(this.name + "-static-keys" + secretSuffix);
+                secret.getMetadata().setNamespace(this.namespace);
+                secret.getMetadata().setAnnotations(new HashMap<String,String>());
+                secret.getMetadata().getAnnotations().put("tremolo.io/last_updated",new DateTime().toString());
+                secret.setData(dataPatch);
 
-                resp = cluster.post( "/api/v1/namespaces/" + this.namespace + "/secrets", secret.toJSONString());
+                resp = cluster.post( "/api/v1/namespaces/" + this.namespace + "/secrets", secret.toJson());
                 if (resp.getResult() < 200 || resp.getResult() > 299) {
                     throw new Exception("Could not write static secret : " + resp.getResult() + " / " + resp.getBody().toJSONString());
                 }
             } else {
                 System.out.println("Writing Secret to " + secretURI);
-                JSONObject data = new JSONObject();
-                data.put("data", dataPatch);
-                resp = cluster.patch(secretURI, data.toJSONString());
+                
+                io.k8s.obj.IoK8sApiCoreV1Secret secret = new io.k8s.obj.IoK8sApiCoreV1Secret();
+                secret.setMetadata(new IoK8sApimachineryPkgApisMetaV1ObjectMeta());
+                secret.getMetadata().setAnnotations(new HashMap<String,String>());
+                secret.getMetadata().getAnnotations().put("tremolo.io/last_updated",new DateTime().toString());
+                secret.setData(dataPatch);
+
+                String tmpJson = secret.toJson();
+                JSONObject secretObj = (JSONObject) new JSONParser().parse(tmpJson);
+                JSONObject data = (JSONObject) secretObj.get("data");
+
+                for (String staticKeyToDelete : staticKeys.keySet()) {                    
+                    data.put(staticKeyToDelete, null);
+                }
+
+                String secretToWrite = secretObj.toString();
+
+
+                
+                resp = cluster.patch(secretURI, secretToWrite);
                 if (resp.getResult() < 200 || resp.getResult() > 299) {
                     throw new Exception("Could not write static secret : " + resp.getResult() + " / " + resp.getBody().toJSONString());
                 }
@@ -207,6 +321,12 @@ public class Generator {
         //String myIp = NetUtils.whatsMyIP();
         //String mask = myIp.substring(0,myIp.indexOf("."));
         this.props.put("OU_QUARTZ_MASK", "");
+
+        if (this.ou.getSpec().getMyvdConfigmap() != null && ! this.ou.getSpec().getMyvdConfigmap().isBlank())  {
+            this.props.put("MYVD_CONFIG_PATH", "/etc/myvd/myvd.conf");
+        } else {
+            this.props.put("MYVD_CONFIG_PATH", "WEB-INF/myvd.conf");
+        }
     
 
     }
@@ -427,7 +547,604 @@ public class Generator {
     
     }
 
+    private String asYaml(String jsonString) throws JsonProcessingException, IOException {
+        // parse JSON
+        JsonNode jsonNodeTree = new ObjectMapper().readTree(jsonString);
+        // save it as YAML
+        String jsonAsYaml = new YAMLMapper().writeValueAsString(jsonNodeTree);
+        return jsonAsYaml;
+    }
+
+
     
+
+    private void updateValidatingWebhookCertificate() throws Exception {
+        String whUriNs = "/apis/admissionregistration.k8s.io/v1/validatingwebhookconfigurations/openunison-workflow-validation-" + this.name;
+        
+        System.out.println("Starting webhook check, looking up " + whUriNs);
+        WsResponse resp = cluster.get(whUriNs);
+
+        if (resp.getResult() != 200) {
+            System.out.println("Unable to load: " + resp.getResult() + " / " + resp.getBody().toJSONString());
+            return;
+        } 
+
+        java.security.cert.Certificate unisonCert = this.ouKs.getCertificate("unison-tls");
+
+        if (unisonCert == null) {
+            System.out.println("unison-tls certificate does not exist, not attempting any updates");
+            return;
+        }
+
+        
+
+        String fromSecretCertBase64 = java.util.Base64.getEncoder().encodeToString(CertUtils.exportCert((X509Certificate) unisonCert).getBytes("UTF-8"));
+        
+        io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhookConfiguration webHookObj = JSON.getGson().fromJson(resp.getBody().toString(),IoK8sApiAdmissionregistrationV1ValidatingWebhookConfiguration.class);
+
+        
+        webHookObj.getWebhooks().get(0).getClientConfig().getCaBundle();
+        
+
+        
+
+        
+
+    }
+
+
+    private static DateTypeAdapter dateTypeAdapter = new DateTypeAdapter();
+    private static SqlDateTypeAdapter sqlDateTypeAdapter = new SqlDateTypeAdapter();
+    private static OffsetDateTimeTypeAdapter offsetDateTimeTypeAdapter = new OffsetDateTimeTypeAdapter();
+    private static LocalDateTypeAdapter localDateTypeAdapter = new LocalDateTypeAdapter();
+    private static ByteArrayAdapter byteArrayAdapter = new ByteArrayAdapter();
+
+    static {
+        
+            GsonBuilder gsonBuilder = io.k8s.JSON.createGson();
+            gsonBuilder.registerTypeAdapter(Date.class, dateTypeAdapter);
+            gsonBuilder.registerTypeAdapter(java.sql.Date.class, sqlDateTypeAdapter);
+            gsonBuilder.registerTypeAdapter(OffsetDateTime.class, offsetDateTimeTypeAdapter);
+            gsonBuilder.registerTypeAdapter(LocalDate.class, localDateTypeAdapter);
+            gsonBuilder.registerTypeAdapter(byte[].class, byteArrayAdapter);
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1MatchCondition.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1MutatingWebhook.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1MutatingWebhookConfiguration.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1MutatingWebhookConfigurationList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1RuleWithOperations.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1ServiceReference.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhook.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhookConfiguration.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhookConfigurationList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1WebhookClientConfig.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1AuditAnnotation.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1ExpressionWarning.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1MatchCondition.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1MatchResources.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1NamedRuleWithOperations.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1ParamKind.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1ParamRef.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1TypeChecking.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1ValidatingAdmissionPolicy.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1ValidatingAdmissionPolicyBinding.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1ValidatingAdmissionPolicyBindingList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1ValidatingAdmissionPolicyBindingSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1ValidatingAdmissionPolicyList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1ValidatingAdmissionPolicySpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1ValidatingAdmissionPolicyStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1Validation.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiApiserverinternalV1alpha1ServerStorageVersion.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiApiserverinternalV1alpha1StorageVersion.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiApiserverinternalV1alpha1StorageVersionCondition.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiApiserverinternalV1alpha1StorageVersionList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiApiserverinternalV1alpha1StorageVersionStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1ControllerRevision.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1ControllerRevisionList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1DaemonSet.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1DaemonSetCondition.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1DaemonSetList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1DaemonSetSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1DaemonSetStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1DaemonSetUpdateStrategy.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1Deployment.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1DeploymentCondition.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1DeploymentList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1DeploymentSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1DeploymentStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1DeploymentStrategy.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1ReplicaSet.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1ReplicaSetCondition.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1ReplicaSetList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1ReplicaSetSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1ReplicaSetStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1RollingUpdateDaemonSet.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1RollingUpdateDeployment.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1RollingUpdateStatefulSetStrategy.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1StatefulSet.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1StatefulSetCondition.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1StatefulSetList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1StatefulSetOrdinals.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1StatefulSetPersistentVolumeClaimRetentionPolicy.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1StatefulSetSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1StatefulSetStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAppsV1StatefulSetUpdateStrategy.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthenticationV1BoundObjectReference.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthenticationV1TokenRequest.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthenticationV1TokenRequestSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthenticationV1TokenRequestStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthenticationV1TokenReview.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthenticationV1TokenReviewSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthenticationV1TokenReviewStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthenticationV1UserInfo.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthenticationV1alpha1SelfSubjectReview.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthenticationV1alpha1SelfSubjectReviewStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthenticationV1beta1SelfSubjectReview.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthenticationV1beta1SelfSubjectReviewStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthorizationV1LocalSubjectAccessReview.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthorizationV1NonResourceAttributes.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthorizationV1NonResourceRule.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthorizationV1ResourceAttributes.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthorizationV1ResourceRule.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthorizationV1SelfSubjectAccessReview.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthorizationV1SelfSubjectAccessReviewSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthorizationV1SelfSubjectRulesReview.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthorizationV1SelfSubjectRulesReviewSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthorizationV1SubjectAccessReview.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthorizationV1SubjectAccessReviewSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthorizationV1SubjectAccessReviewStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthorizationV1SubjectRulesReviewStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV1CrossVersionObjectReference.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV1HorizontalPodAutoscaler.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV1HorizontalPodAutoscalerList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV1HorizontalPodAutoscalerSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV1HorizontalPodAutoscalerStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV1Scale.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV1ScaleSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV1ScaleStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV2ContainerResourceMetricSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV2ContainerResourceMetricStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV2CrossVersionObjectReference.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV2ExternalMetricSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV2ExternalMetricStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV2HPAScalingPolicy.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV2HPAScalingRules.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV2HorizontalPodAutoscaler.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV2HorizontalPodAutoscalerBehavior.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV2HorizontalPodAutoscalerCondition.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV2HorizontalPodAutoscalerList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV2HorizontalPodAutoscalerSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV2HorizontalPodAutoscalerStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV2MetricIdentifier.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV2MetricSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV2MetricStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV2MetricTarget.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV2MetricValueStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV2ObjectMetricSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV2ObjectMetricStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV2PodsMetricSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV2PodsMetricStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV2ResourceMetricSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAutoscalingV2ResourceMetricStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiBatchV1CronJob.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiBatchV1CronJobList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiBatchV1CronJobSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiBatchV1CronJobStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiBatchV1Job.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiBatchV1JobCondition.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiBatchV1JobList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiBatchV1JobSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiBatchV1JobStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiBatchV1JobTemplateSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiBatchV1PodFailurePolicy.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiBatchV1PodFailurePolicyOnExitCodesRequirement.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiBatchV1PodFailurePolicyOnPodConditionsPattern.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiBatchV1PodFailurePolicyRule.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiBatchV1UncountedTerminatedPods.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCertificatesV1CertificateSigningRequest.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCertificatesV1CertificateSigningRequestCondition.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCertificatesV1CertificateSigningRequestList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCertificatesV1CertificateSigningRequestSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCertificatesV1CertificateSigningRequestStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCertificatesV1alpha1ClusterTrustBundle.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCertificatesV1alpha1ClusterTrustBundleList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCertificatesV1alpha1ClusterTrustBundleSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoordinationV1Lease.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoordinationV1LeaseList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoordinationV1LeaseSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1AWSElasticBlockStoreVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1Affinity.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1AttachedVolume.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1AzureDiskVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1AzureFilePersistentVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1AzureFileVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1Binding.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1CSIPersistentVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1CSIVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1Capabilities.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1CephFSPersistentVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1CephFSVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1CinderPersistentVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1CinderVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ClaimSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ClientIPConfig.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ComponentCondition.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ComponentStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ComponentStatusList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ConfigMap.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ConfigMapEnvSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ConfigMapKeySelector.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ConfigMapList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ConfigMapNodeConfigSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ConfigMapProjection.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ConfigMapVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1Container.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ContainerImage.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ContainerPort.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ContainerResizePolicy.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ContainerState.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ContainerStateRunning.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ContainerStateTerminated.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ContainerStateWaiting.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ContainerStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1DaemonEndpoint.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1DownwardAPIProjection.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1DownwardAPIVolumeFile.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1DownwardAPIVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1EmptyDirVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1EndpointAddress.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1EndpointPort.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1EndpointSubset.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1Endpoints.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1EndpointsList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1EnvFromSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1EnvVar.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1EnvVarSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1EphemeralContainer.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1EphemeralVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1Event.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1EventList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1EventSeries.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1EventSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ExecAction.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1FCVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1FlexPersistentVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1FlexVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1FlockerVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1GCEPersistentDiskVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1GRPCAction.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1GitRepoVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1GlusterfsPersistentVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1GlusterfsVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1HTTPGetAction.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1HTTPHeader.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1HostAlias.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1HostPathVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ISCSIPersistentVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ISCSIVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1KeyToPath.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1Lifecycle.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1LifecycleHandler.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1LimitRange.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1LimitRangeItem.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1LimitRangeList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1LimitRangeSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1LoadBalancerIngress.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1LoadBalancerStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1LocalObjectReference.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1LocalVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1NFSVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1Namespace.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1NamespaceCondition.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1NamespaceList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1NamespaceSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1NamespaceStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1Node.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1NodeAddress.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1NodeAffinity.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1NodeCondition.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1NodeConfigSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1NodeConfigStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1NodeDaemonEndpoints.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1NodeList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1NodeSelector.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1NodeSelectorRequirement.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1NodeSelectorTerm.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1NodeSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1NodeStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1NodeSystemInfo.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ObjectFieldSelector.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ObjectReference.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PersistentVolume.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PersistentVolumeClaim.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PersistentVolumeClaimCondition.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PersistentVolumeClaimList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PersistentVolumeClaimSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PersistentVolumeClaimStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PersistentVolumeClaimTemplate.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PersistentVolumeClaimVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PersistentVolumeList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PersistentVolumeSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PersistentVolumeStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PhotonPersistentDiskVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1Pod.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PodAffinity.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PodAffinityTerm.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PodAntiAffinity.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PodCondition.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PodDNSConfig.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PodDNSConfigOption.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PodIP.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PodList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PodOS.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PodReadinessGate.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PodResourceClaim.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PodSchedulingGate.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PodSecurityContext.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PodSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PodStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PodTemplate.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PodTemplateList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PodTemplateSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PortStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PortworxVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1PreferredSchedulingTerm.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1Probe.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ProjectedVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1QuobyteVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1RBDPersistentVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1RBDVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ReplicationController.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ReplicationControllerCondition.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ReplicationControllerList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ReplicationControllerSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ReplicationControllerStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ResourceClaim.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ResourceFieldSelector.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ResourceQuota.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ResourceQuotaList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ResourceQuotaSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ResourceQuotaStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ResourceRequirements.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1SELinuxOptions.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ScaleIOPersistentVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ScaleIOVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ScopeSelector.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ScopedResourceSelectorRequirement.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1SeccompProfile.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1Secret.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1SecretEnvSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1SecretKeySelector.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1SecretList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1SecretProjection.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1SecretReference.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1SecretVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1SecurityContext.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1Service.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ServiceAccount.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ServiceAccountList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ServiceAccountTokenProjection.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ServiceList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ServicePort.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ServiceSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ServiceStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1SessionAffinityConfig.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1StorageOSPersistentVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1StorageOSVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1Sysctl.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1TCPSocketAction.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1Taint.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1Toleration.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1TopologySelectorLabelRequirement.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1TopologySelectorTerm.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1TopologySpreadConstraint.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1TypedLocalObjectReference.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1TypedObjectReference.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1Volume.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1VolumeDevice.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1VolumeMount.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1VolumeNodeAffinity.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1VolumeProjection.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1VsphereVirtualDiskVolumeSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1WeightedPodAffinityTerm.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1WindowsSecurityContextOptions.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiDiscoveryV1Endpoint.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiDiscoveryV1EndpointConditions.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiDiscoveryV1EndpointHints.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiDiscoveryV1EndpointPort.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiDiscoveryV1EndpointSlice.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiDiscoveryV1EndpointSliceList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiDiscoveryV1ForZone.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiEventsV1Event.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiEventsV1EventList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiEventsV1EventSeries.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2FlowDistinguisherMethod.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2FlowSchema.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2FlowSchemaCondition.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2FlowSchemaList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2FlowSchemaSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2FlowSchemaStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2GroupSubject.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2LimitResponse.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2LimitedPriorityLevelConfiguration.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2NonResourcePolicyRule.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2PolicyRulesWithSubjects.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2PriorityLevelConfiguration.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2PriorityLevelConfigurationCondition.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2PriorityLevelConfigurationList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2PriorityLevelConfigurationReference.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2PriorityLevelConfigurationSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2PriorityLevelConfigurationStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2QueuingConfiguration.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2ResourcePolicyRule.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2ServiceAccountSubject.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2Subject.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2UserSubject.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3FlowDistinguisherMethod.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3FlowSchema.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3FlowSchemaCondition.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3FlowSchemaList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3FlowSchemaSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3FlowSchemaStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3GroupSubject.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3LimitResponse.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3LimitedPriorityLevelConfiguration.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3NonResourcePolicyRule.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3PolicyRulesWithSubjects.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3PriorityLevelConfiguration.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3PriorityLevelConfigurationCondition.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3PriorityLevelConfigurationList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3PriorityLevelConfigurationReference.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3PriorityLevelConfigurationSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3PriorityLevelConfigurationStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3QueuingConfiguration.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3ResourcePolicyRule.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3ServiceAccountSubject.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3Subject.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3UserSubject.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1HTTPIngressPath.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1HTTPIngressRuleValue.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1IPBlock.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1Ingress.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1IngressBackend.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1IngressClass.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1IngressClassList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1IngressClassParametersReference.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1IngressClassSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1IngressList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1IngressLoadBalancerIngress.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1IngressLoadBalancerStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1IngressPortStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1IngressRule.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1IngressServiceBackend.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1IngressSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1IngressStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1IngressTLS.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1NetworkPolicy.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1NetworkPolicyEgressRule.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1NetworkPolicyIngressRule.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1NetworkPolicyList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1NetworkPolicyPeer.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1NetworkPolicyPort.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1NetworkPolicySpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1NetworkPolicyStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1ServiceBackendPort.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1alpha1ClusterCIDR.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1alpha1ClusterCIDRList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1alpha1ClusterCIDRSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1alpha1IPAddress.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1alpha1IPAddressList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1alpha1IPAddressSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1alpha1ParentReference.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNodeV1Overhead.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNodeV1RuntimeClass.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNodeV1RuntimeClassList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNodeV1Scheduling.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiPolicyV1Eviction.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiPolicyV1PodDisruptionBudget.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiPolicyV1PodDisruptionBudgetList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiPolicyV1PodDisruptionBudgetSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiPolicyV1PodDisruptionBudgetStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiRbacV1AggregationRule.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiRbacV1ClusterRole.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiRbacV1ClusterRoleBinding.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiRbacV1ClusterRoleBindingList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiRbacV1ClusterRoleList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiRbacV1PolicyRule.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiRbacV1Role.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiRbacV1RoleBinding.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiRbacV1RoleBindingList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiRbacV1RoleList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiRbacV1RoleRef.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiRbacV1Subject.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2AllocationResult.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2PodSchedulingContext.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2PodSchedulingContextList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2PodSchedulingContextSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2PodSchedulingContextStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClaim.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClaimConsumerReference.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClaimList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClaimParametersReference.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClaimSchedulingStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClaimSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClaimStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClaimTemplate.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClaimTemplateList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClaimTemplateSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClass.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClassList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClassParametersReference.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceHandle.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiSchedulingV1PriorityClass.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiSchedulingV1PriorityClassList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiStorageV1CSIDriver.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiStorageV1CSIDriverList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiStorageV1CSIDriverSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiStorageV1CSINode.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiStorageV1CSINodeDriver.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiStorageV1CSINodeList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiStorageV1CSINodeSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiStorageV1CSIStorageCapacity.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiStorageV1CSIStorageCapacityList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiStorageV1StorageClass.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiStorageV1StorageClassList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiStorageV1TokenRequest.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiStorageV1VolumeAttachment.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiStorageV1VolumeAttachmentList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiStorageV1VolumeAttachmentSource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiStorageV1VolumeAttachmentSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiStorageV1VolumeAttachmentStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiStorageV1VolumeError.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiStorageV1VolumeNodeResources.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiextensionsApiserverPkgApisApiextensionsV1CustomResourceColumnDefinition.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiextensionsApiserverPkgApisApiextensionsV1CustomResourceConversion.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiextensionsApiserverPkgApisApiextensionsV1CustomResourceDefinition.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiextensionsApiserverPkgApisApiextensionsV1CustomResourceDefinitionCondition.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiextensionsApiserverPkgApisApiextensionsV1CustomResourceDefinitionList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiextensionsApiserverPkgApisApiextensionsV1CustomResourceDefinitionNames.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiextensionsApiserverPkgApisApiextensionsV1CustomResourceDefinitionSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiextensionsApiserverPkgApisApiextensionsV1CustomResourceDefinitionStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiextensionsApiserverPkgApisApiextensionsV1CustomResourceDefinitionVersion.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiextensionsApiserverPkgApisApiextensionsV1CustomResourceSubresourceScale.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiextensionsApiserverPkgApisApiextensionsV1CustomResourceSubresources.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiextensionsApiserverPkgApisApiextensionsV1CustomResourceValidation.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiextensionsApiserverPkgApisApiextensionsV1ExternalDocumentation.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiextensionsApiserverPkgApisApiextensionsV1JSONSchemaProps.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiextensionsApiserverPkgApisApiextensionsV1ServiceReference.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiextensionsApiserverPkgApisApiextensionsV1ValidationRule.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiextensionsApiserverPkgApisApiextensionsV1WebhookClientConfig.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiextensionsApiserverPkgApisApiextensionsV1WebhookConversion.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApimachineryPkgApisMetaV1APIGroup.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApimachineryPkgApisMetaV1APIGroupList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApimachineryPkgApisMetaV1APIResource.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApimachineryPkgApisMetaV1APIResourceList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApimachineryPkgApisMetaV1APIVersions.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApimachineryPkgApisMetaV1Condition.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApimachineryPkgApisMetaV1DeleteOptions.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApimachineryPkgApisMetaV1GroupVersionForDiscovery.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApimachineryPkgApisMetaV1LabelSelector.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApimachineryPkgApisMetaV1LabelSelectorRequirement.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApimachineryPkgApisMetaV1ListMeta.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApimachineryPkgApisMetaV1ManagedFieldsEntry.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApimachineryPkgApisMetaV1ObjectMeta.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApimachineryPkgApisMetaV1OwnerReference.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApimachineryPkgApisMetaV1Preconditions.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApimachineryPkgApisMetaV1ServerAddressByClientCIDR.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApimachineryPkgApisMetaV1Status.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApimachineryPkgApisMetaV1StatusCause.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApimachineryPkgApisMetaV1StatusDetails.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApimachineryPkgApisMetaV1WatchEvent.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApimachineryPkgVersionInfo.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sKubeAggregatorPkgApisApiregistrationV1APIService.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sKubeAggregatorPkgApisApiregistrationV1APIServiceCondition.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sKubeAggregatorPkgApisApiregistrationV1APIServiceList.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sKubeAggregatorPkgApisApiregistrationV1APIServiceSpec.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sKubeAggregatorPkgApisApiregistrationV1APIServiceStatus.CustomTypeAdapterFactory());
+            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sKubeAggregatorPkgApisApiregistrationV1ServiceReference.CustomTypeAdapterFactory());
+            io.k8s.JSON.setGson(gsonBuilder.create());
+        
+    
+    }
     
     
 }

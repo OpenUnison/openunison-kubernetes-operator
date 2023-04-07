@@ -7,7 +7,7 @@
 
   <groupId>com.tremolosecurity.openunison</groupId>
   <artifactId>operator</artifactId>
-  <version>0.0.1</version>
+  <version>0.0.2</version>
 
   <name>openunison-kubernetes-operator</name>
 
@@ -19,7 +19,9 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <swagger-annotations-version>1.6.3</swagger-annotations-version>
     <jersey-version>2.35</jersey-version>
-    <jackson-version>2.13.0</jackson-version>
+    <jackson.version>2.14.2</jackson.version>
+		<jackson-core.version>2.14.2</jackson-core.version>
+    <jackson-version>2.14.2</jackson-version>
     <jackson-databind-version>2.14.2</jackson-databind-version>
     <jackson-databind-nullable-version>0.2.1</jackson-databind-nullable-version>
     <jakarta-annotation-version>1.3.5</jakarta-annotation-version>
@@ -103,6 +105,16 @@
 
     </dependency>
     <dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+  			<artifactId>jackson-databind</artifactId>
+			<version>${jackson.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.fasterxml.jackson.dataformat</groupId>
+  			<artifactId>jackson-dataformat-yaml</artifactId>
+			<version>${jackson-core.version}</version>
+		</dependency>
+    <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
       <scope>test</scope>
@@ -159,6 +171,7 @@
         <!-- /RELEASE_VERSION -->
         <executions>
           <execution>
+            <id>gen-ou-crd-api</id>
             <goals>
               <goal>generate</goal>
             </goals>
@@ -175,6 +188,27 @@
               </configOptions>
             </configuration>
           </execution>
+          <execution>
+            <id>gen-k8s-api</id>
+            <goals>
+              <goal>generate</goal>
+            </goals>
+            <configuration>
+              <inputSpec>${project.basedir}/src/main/resources/kubernetes-api-1.27.json</inputSpec>
+              <generatorName>java</generatorName>
+              <library>okhttp-gson</library>
+              <generateApis>false</generateApis>
+              
+              <!--<generateSupportingFiles>false</generateSupportingFiles>-->
+              <supportingFilesToGenerate>JSON.java,RFC3339DateFormat.java</supportingFilesToGenerate>
+              <configOptions>
+                <sourceFolder>src/main/java</sourceFolder>
+                <modelPackage>io.k8s.obj</modelPackage>
+
+              </configOptions>
+            </configuration>
+          </execution>
+          
         </executions>
       </plugin>
     </plugins>
@@ -207,6 +241,7 @@
             <!-- /RELEASE_VERSION -->
             <executions>
               <execution>
+                <id>gen-ou-crd-api</id>
                 <goals>
                   <goal>generate</goal>
                 </goals>
@@ -215,7 +250,7 @@
                   <generatorName>java</generatorName>
                   <library>okhttp-gson</library>
                   <generateApis>false</generateApis>
-                  <!--<generateSupportingFiles>false</generateSupportingFiles>-->
+                  
                   <supportingFilesToGenerate>JSON.java,RFC3339DateFormat.java</supportingFilesToGenerate>
                   <configOptions>
                     <sourceFolder>src/main/java</sourceFolder>
@@ -224,6 +259,27 @@
                   </configOptions>
                 </configuration>
               </execution>
+              <execution>
+                <id>gen-k8s-api</id>
+                <goals>
+                  <goal>generate</goal>
+                </goals>
+                <configuration>
+                  <inputSpec>${project.basedir}/src/main/resources/kubernetes-api-1.27.json</inputSpec>
+                  <generatorName>java</generatorName>
+                  <library>okhttp-gson</library>
+                  <generateApis>false</generateApis>
+                  
+                  <!--<generateSupportingFiles>false</generateSupportingFiles>-->
+                  <supportingFilesToGenerate>JSON.java,RFC3339DateFormat.java</supportingFilesToGenerate>
+                  <configOptions>
+                    <sourceFolder>src/main/java</sourceFolder>
+                    <modelPackage>io.k8s.obj</modelPackage>
+    
+                  </configOptions>
+                </configuration>
+              </execution>
+              
             </executions>
           </plugin>
           <plugin>

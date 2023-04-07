@@ -408,9 +408,16 @@ public class CertUtils {
     public static String encodeKeyStore(KeyStore ks, String ksPassword)
             throws KeyStoreException, NoSuchAlgorithmException, CertificateException, IOException {
 
+        
+        return java.util.Base64.getEncoder().encodeToString(encodeKeyStoreToBytes(ks, ksPassword));
+    }
+
+    public static byte[] encodeKeyStoreToBytes(KeyStore ks, String ksPassword)
+            throws KeyStoreException, NoSuchAlgorithmException, CertificateException, IOException {
+
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         ks.store(baos, ksPassword.toCharArray());
-        return java.util.Base64.getEncoder().encodeToString(baos.toByteArray());
+        return baos.toByteArray();
     }
 
     public static void importKeyPairAndCert(KeyStore ks, String ksPass, String alias, String privateKeyEncoded,
@@ -549,10 +556,8 @@ public class CertUtils {
     public static KeyStore mergeCaCerts(KeyStore ks) throws KeyStoreException, NoSuchAlgorithmException,
             CertificateException, FileNotFoundException, IOException {
         KeyStore cacerts = KeyStore.getInstance(KeyStore.getDefaultType());
-        String cacertsPath = System.getProperty("javax.net.ssl.trustStore");
-        if (cacertsPath == null) {
-            cacertsPath = System.getProperty("java.home") + "/lib/security/cacerts";
-        }
+        String cacertsPath = System.getenv("CA_CERTS_PATH");
+        
         
         cacerts.load(new FileInputStream(cacertsPath), null);
         

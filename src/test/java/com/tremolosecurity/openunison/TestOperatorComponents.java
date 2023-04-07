@@ -4,6 +4,7 @@ package com.tremolosecurity.openunison;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.IOException;
 import java.net.URI;
@@ -111,6 +112,101 @@ public class TestOperatorComponents {
     }
 
     @Test
+    public void testStaticDeleteRemovedSecret() throws Exception {
+        // delete the static secret and make sure it gets created
+        com.tremolosecurity.openunison.crd.OpenUnison ou = loadOrchestra();
+
+        // make sure the Secret is still there
+        WsResponse resp = cluster.get("/api/v1/namespaces/openunison/secrets/orchestra-static-keys");
+        assertEquals(200,resp.getResult());
+
+        String curKey = getKey((String)((JSONObject)resp.getBody().get("data")).get("session-unison"));
+        int curVersion = getVersion((String)((JSONObject)resp.getBody().get("data")).get("session-unison"));
+        String curLastMileKey = (String)((JSONObject)resp.getBody().get("data")).get("lastmile-oidc");
+
+        assertNotNull(curLastMileKey);
+
+
+
+        // make sure the current key verison is "1"
+        OpenUnisonSpecKeyStoreStaticKeysInner lastmilekey = null;
+        for  (OpenUnisonSpecKeyStoreStaticKeysInner key : ou.getSpec().getKeyStore().getStaticKeys()) {
+            if (key.getName().equals("lastmile-oidc")) {
+                lastmilekey = key;
+            }
+        }
+
+        assertNotNull(lastmilekey);
+        ou.getSpec().getKeyStore().getStaticKeys().remove(lastmilekey);
+
+        Generator gensecret = new Generator();
+        gensecret.load(ou,cluster,"openunison","orchestra");
+
+        System.out.println("Sleeping for 3 seconds");
+        Thread.sleep(3000);
+
+        resp = cluster.get("/api/v1/namespaces/openunison/secrets/orchestra-static-keys");
+        assertEquals(200,resp.getResult());
+
+        
+        String newLastMileKey = (String)((JSONObject)resp.getBody().get("data")).get("lastmile-oidc");
+        assertNull(newLastMileKey);
+        
+        // cleanup, patch the Secret
+        JSONObject root = new JSONObject();
+        JSONObject data = new JSONObject();
+        root.put("data",data);
+        data.put("lastmile-oidc",curLastMileKey);
+        assertEquals(cluster.patch("/api/v1/namespaces/openunison/secrets/orchestra-static-keys", root.toJSONString()).getResult(),200);
+    }
+
+    @Test
+    public void testStaticAddNewSecret() throws Exception {
+        // delete the static secret and make sure it gets created
+        com.tremolosecurity.openunison.crd.OpenUnison ou = loadOrchestra();
+
+        // make sure the Secret is still there
+        WsResponse resp = cluster.get("/api/v1/namespaces/openunison/secrets/orchestra-static-keys");
+        assertEquals(200,resp.getResult());
+
+        String curKey = getKey((String)((JSONObject)resp.getBody().get("data")).get("session-unison"));
+        int curVersion = getVersion((String)((JSONObject)resp.getBody().get("data")).get("session-unison"));
+        String curLastMileKey = (String)((JSONObject)resp.getBody().get("data")).get("lastmile-oidcx");
+
+        assertNull(curLastMileKey);
+
+
+
+        // make sure the current key verison is "1"
+        OpenUnisonSpecKeyStoreStaticKeysInner lastmilexkey = new OpenUnisonSpecKeyStoreStaticKeysInner();
+        lastmilexkey.setName("lastmile-oidcx");
+        lastmilexkey.setVersion(1);
+        
+        
+        ou.getSpec().getKeyStore().getStaticKeys().add(lastmilexkey);
+
+        Generator gensecret = new Generator();
+        gensecret.load(ou,cluster,"openunison","orchestra");
+
+        System.out.println("Sleeping for 3 seconds");
+        Thread.sleep(3000);
+
+        resp = cluster.get("/api/v1/namespaces/openunison/secrets/orchestra-static-keys");
+        assertEquals(200,resp.getResult());
+
+        
+        String newLastMileKey = (String)((JSONObject)resp.getBody().get("data")).get("lastmile-oidcx");
+        assertNotNull(newLastMileKey);
+        
+        // cleanup, patch the Secret
+        JSONObject root = new JSONObject();
+        JSONObject data = new JSONObject();
+        root.put("data",data);
+        data.put("lastmile-oidcx",null);
+        assertEquals(cluster.patch("/api/v1/namespaces/openunison/secrets/orchestra-static-keys", root.toJSONString()).getResult(),200);
+    }
+
+    @Test
     public void testLoadObject() throws Exception {
         com.tremolosecurity.openunison.crd.OpenUnison ou = loadOrchestra();
 
@@ -213,6 +309,7 @@ public class TestOperatorComponents {
             throws Exception, URISyntaxException, IOException, InterruptedException, ParseException {
         cluster.findVersion();
         JSON.setGson(JSON.createGson().create());
+        
 
         SSLContext sslCtx = cluster.generateSSLContext();
         HttpClient http = HttpClient.newBuilder()

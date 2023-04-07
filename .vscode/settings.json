@@ -4,7 +4,8 @@
             "API_SERVER_URL":"https://192.168.2.2:443",
             "PATH_TO_CA_CRT":"/Users/marcboorshtein/ca.crt",
             "PATH_TO_TOKEN":"/Users/marcboorshtein/token.txt",
-            "EXPECTED_IMAGE":"docker.io/mlbiamscratchpad/ou-k8s"
+            "EXPECTED_IMAGE":"docker.io/mlbiamscratchpad/ou-k8s",
+            "CA_CERTS_PATH":"/Users/marcboorshtein/Downloads/graalvm-ce-java17-22.2.0/Contents/Home/lib/security/cacerts"
         }
     }
 }
