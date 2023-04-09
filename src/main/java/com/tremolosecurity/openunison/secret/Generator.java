@@ -91,6 +91,7 @@ public class Generator {
         this.generateKeyStore();
         this.generateStaticKeys();
         this.generateOpenUnisonSecret();
+        this.updateValidatingWebhookCertificate();
     }
 
     private void generateOpenUnisonSecret() throws KeyStoreException, NoSuchAlgorithmException, CertificateException, FileNotFoundException, IOException, ParseException, InterruptedException, URISyntaxException {
@@ -578,16 +579,34 @@ public class Generator {
 
         
 
+        byte[] unisonCertBytes = unisonCert.getEncoded();
+
         String fromSecretCertBase64 = java.util.Base64.getEncoder().encodeToString(CertUtils.exportCert((X509Certificate) unisonCert).getBytes("UTF-8"));
         
-        io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhookConfiguration webHookObj = JSON.getGson().fromJson(resp.getBody().toString(),IoK8sApiAdmissionregistrationV1ValidatingWebhookConfiguration.class);
+        io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhookConfiguration webHookObj = io.k8s.JSON.getGson().fromJson(resp.getBody().toString(),IoK8sApiAdmissionregistrationV1ValidatingWebhookConfiguration.class);
 
         
-        webHookObj.getWebhooks().get(0).getClientConfig().getCaBundle();
-        
+        String fromWh =  new String(java.util.Base64.getEncoder().encode(webHookObj.getWebhooks().get(0).getClientConfig().getCaBundle()));
 
-        
+        if (! fromSecretCertBase64.equals(fromWh)) {
+            System.out.println("Webhook needs to be udpated");
+            for (IoK8sApiAdmissionregistrationV1ValidatingWebhook wh : webHookObj.getWebhooks()) {
+                wh.getClientConfig().setCaBundle(unisonCertBytes);
+            }
 
+            io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhookConfiguration forPatch = new io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhookConfiguration();
+            forPatch.setWebhooks(webHookObj.getWebhooks());
+            String jsonForPatch = forPatch.toJson();
+            resp = cluster.patch(whUriNs, jsonForPatch);
+            if (resp.getResult() < 200 || resp.getResult() > 299) {
+                throw new Exception("Could not patch webhook : " + resp.getResult() + " / " + resp.getBody().toString());
+                
+            } else {
+                System.out.println("Webhook successfully patched");
+            }
+        } else {
+            System.out.println("Webhook does not need to be udpated");
+        }
         
 
     }

@@ -2,9 +2,11 @@ package com.tremolosecurity.openunison;
 
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.URI;
@@ -14,6 +16,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
@@ -32,6 +35,10 @@ import com.tremolosecurity.openunison.crd.OpenUnisonSpecKeyStoreStaticKeysInner;
 import com.tremolosecurity.openunison.kubernetes.ClusterConnection;
 import com.tremolosecurity.openunison.obj.WsResponse;
 import com.tremolosecurity.openunison.secret.Generator;
+import com.tremolosecurity.openunison.util.CertUtils;
+
+import io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhook;
+import io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhookConfiguration;
 
 public class TestOperatorComponents {
 
@@ -212,6 +219,9 @@ public class TestOperatorComponents {
 
         assertEquals(ou.getSpec().getImage(),System.getenv("EXPECTED_IMAGE"));
 
+        byte[] origUnisonTls = null;
+        byte[] newUnisonTls = null;
+
         // get unison-tls-secret resource version then delete it
         String unisonTlsUid = null;
         WsResponse resp = cluster.get("/api/v1/namespaces/openunison/secrets/unison-tls");
@@ -219,6 +229,8 @@ public class TestOperatorComponents {
             // the secret exists, lets get the resource version
             JSONObject metadata = (JSONObject) resp.getBody().get("metadata");
             unisonTlsUid = (String) metadata.get("uid");
+            String b64cert = (String) ((JSONObject) resp.getBody().get("data")).get("tls.crt");
+            origUnisonTls = CertUtils.pem2cert(new String(java.util.Base64.getDecoder().decode(b64cert))).getEncoded();
         }
 
         assertNotNull(unisonTlsUid);
@@ -285,6 +297,9 @@ public class TestOperatorComponents {
         
         assertNotEquals(unisonTlsUid,newUnisonTlsUid);
 
+        String b64cert = (String) ((JSONObject) resp.getBody().get("data")).get("tls.crt");
+        newUnisonTls = CertUtils.pem2cert(new String(java.util.Base64.getDecoder().decode(b64cert))).getEncoded();
+
         // validate a new kubernetes-dashboard secret was created
         resp = cluster.get("/api/v1/namespaces/kubernetes-dashboard/secrets/kubernetes-dashboard-certs");
         assertEquals(200, resp.getResult());
@@ -301,6 +316,18 @@ public class TestOperatorComponents {
         metadata = (JSONObject) pod.get("metadata");
         String newK8sDbPodUid = (String) metadata.get("uid");
         assertNotEquals(k8sDbPodUid, newK8sDbPodUid);
+
+        // validate that the webhook was updated
+        String whUriNs = "/apis/admissionregistration.k8s.io/v1/validatingwebhookconfigurations/openunison-workflow-validation-orchestra";
+        resp = cluster.get(whUriNs);
+        assertEquals(200,resp.getResult());
+
+        io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhookConfiguration webHookObj = io.k8s.JSON.getGson().fromJson(resp.getBody().toString(),IoK8sApiAdmissionregistrationV1ValidatingWebhookConfiguration.class);
+
+        for (IoK8sApiAdmissionregistrationV1ValidatingWebhook wh : webHookObj.getWebhooks()) {
+            assertFalse(Arrays.equals(origUnisonTls,wh.getClientConfig().getCaBundle()),wh.getName());
+            assertTrue(Arrays.equals(newUnisonTls,wh.getClientConfig().getCaBundle()),wh.getName());
+        }
         
 
     }
