@@ -16,6 +16,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
@@ -31,7 +32,12 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import com.tremolosecurity.openunison.crd.OpenUnison;
+import com.tremolosecurity.openunison.crd.OpenUnisonSpecHostsInnerAnnotationsInner;
+import com.tremolosecurity.openunison.crd.OpenUnisonSpecKeyStoreKeyPairsKeysInner;
+import com.tremolosecurity.openunison.crd.OpenUnisonSpecKeyStoreKeyPairsKeysInnerCreateData;
 import com.tremolosecurity.openunison.crd.OpenUnisonSpecKeyStoreStaticKeysInner;
+import com.tremolosecurity.openunison.crd.OpenUnisonSpecKeyStoreKeyPairsKeysInner.ImportIntoKsEnum;
+import com.tremolosecurity.openunison.deployment.Updater;
 import com.tremolosecurity.openunison.kubernetes.ClusterConnection;
 import com.tremolosecurity.openunison.obj.WsResponse;
 import com.tremolosecurity.openunison.secret.Generator;
@@ -39,18 +45,220 @@ import com.tremolosecurity.openunison.util.CertUtils;
 
 import io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhook;
 import io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhookConfiguration;
+import io.k8s.obj.IoK8sApiCoreV1Secret;
 
 public class TestOperatorComponents {
 
-    static ClusterConnection cluster;
+    static com.tremolosecurity.openunison.kubernetes.ClusterConnection cluster;
 
     @BeforeAll
-    public static void setup() {
-        cluster = cluster = new ClusterConnection(System.getenv("API_SERVER_URL"),"openunison",System.getenv("PATH_TO_CA_CRT"),System.getenv("PATH_TO_TOKEN"),new String[]{"2","3","4","5","6","7"});
+    public static void setup() throws Exception {
+        cluster = new ClusterConnection(System.getenv("API_SERVER_URL"),"openunison",System.getenv("PATH_TO_CA_CRT"),System.getenv("PATH_TO_TOKEN"),new String[]{"2","3","4","5","6","7"});
+        init();
+    }
+
+    @Test
+    public void testAMQSetup() throws URISyntaxException, IOException, InterruptedException, ParseException, Exception {
+
+        
+        // if amq secret exists, delete it.
+        cluster.delete("/api/v1/namespaces/openunison/secrets/amq-env-secrets-orchestra");
+        cluster.delete("/api/v1/namespaces/openunison/secrets/amq-secrets-orchestra");
+        cluster.delete("/api/v1/namespaces/openunison/secrets/orchestra-amq-client");
+        cluster.delete("/api/v1/namespaces/openunison/secrets/orchestra-amq-server");
+
+        WsResponse resp = cluster.get("/api/v1/namespaces/openunison/secrets/amq-env-secrets-orchestra");
+        assertEquals(404,resp.getResult());
+
+        resp = cluster.get("/api/v1/namespaces/openunison/secrets/amq-secrets-orchestra");
+        assertEquals(404,resp.getResult());
+
+        resp = cluster.get("/api/v1/namespaces/openunison/secrets/orchestra-amq-client");
+        assertEquals(404,resp.getResult());
+
+        resp = cluster.get("/api/v1/namespaces/openunison/secrets/orchestra-amq-server");
+        assertEquals(404,resp.getResult());
+        
+        OpenUnison ou = this.loadOrchestra();
+        
+        ou.getSpec().setEnableActivemq(true);
+        ou.getSpec().getNonSecretData().forEach((nsd) -> {
+            if (nsd.getName().equals("OPENUNISON_PROVISIONING_ENABLED")) {
+                nsd.setValue("true");
+            }
+        });
+
+        ou.getSpec().getNonSecretData().add(
+            new OpenUnisonSpecHostsInnerAnnotationsInner()
+            .name("OU_JDBC_DRIVER")
+            .value("x")
+        );
+
+        ou.getSpec().getNonSecretData().add(
+            new OpenUnisonSpecHostsInnerAnnotationsInner()
+            .name("OU_JDBC_URL")
+            .value("y")
+        );
+
+        ou.getSpec().getNonSecretData().add(
+            new OpenUnisonSpecHostsInnerAnnotationsInner()
+            .name("OU_JDBC_USER")
+            .value("z")
+        );
+
+        ou.getSpec().getNonSecretData().add(
+            new OpenUnisonSpecHostsInnerAnnotationsInner()
+            .name("OU_JDBC_PASSWORD")
+            .value("a")
+        );
+
+        OpenUnisonSpecKeyStoreKeyPairsKeysInner amqServer = new OpenUnisonSpecKeyStoreKeyPairsKeysInner();
+        amqServer.setImportIntoKs(ImportIntoKsEnum.CERTIFICATE);
+        amqServer.setName("amq-server");
+        amqServer.setReplaceIfExists(true);
+        amqServer.setTlsSecretName("orchestra-amq-server");
+        amqServer.setCreateData(new OpenUnisonSpecKeyStoreKeyPairsKeysInnerCreateData());
+        amqServer.getCreateData().caCert(true)
+                                 .keySize(2048)
+                                 .serverName("amq.openunison.svc")
+                                 .signByK8sCa(false)
+                                 .subjectAlternativeNames(new ArrayList<String>());
+        ou.getSpec().getKeyStore().getKeyPairs().addKeysItem(amqServer);
+
+        OpenUnisonSpecKeyStoreKeyPairsKeysInner amqClient = new OpenUnisonSpecKeyStoreKeyPairsKeysInner();
+        amqClient.setImportIntoKs(ImportIntoKsEnum.KEYPAIR);
+        amqClient.setName("amq-client");
+        amqClient.setReplaceIfExists(true);
+        amqClient.setTlsSecretName("orchestra-amq-client");
+        amqClient.setCreateData(new OpenUnisonSpecKeyStoreKeyPairsKeysInnerCreateData());
+        amqClient.getCreateData().caCert(true)
+                                 .keySize(2048)
+                                 .serverName("amq-client")
+                                 .signByK8sCa(false)
+                                 .subjectAlternativeNames(new ArrayList<String>());
+        ou.getSpec().getKeyStore().getKeyPairs().addKeysItem(amqClient);
+
+
+        
+
+
+        Generator gensecret = new Generator();
+        gensecret.load(ou,cluster,"openunison","orchestra");
+
+        System.out.println("Sleeping for two seconds");
+        Thread.sleep(2000);
+
+        resp = cluster.get("/api/v1/namespaces/openunison/secrets/orchestra-amq-client");
+        assertEquals(200,resp.getResult());
+
+        IoK8sApiCoreV1Secret amqClientCert = io.k8s.JSON.getGson().fromJson(resp.getBody().toJSONString(), IoK8sApiCoreV1Secret.class);
+
+        resp = cluster.get("/api/v1/namespaces/openunison/secrets/orchestra-amq-server");
+        assertEquals(200,resp.getResult());
+
+        resp = cluster.get("/api/v1/namespaces/openunison/secrets/amq-secrets-orchestra");
+        assertEquals(200,resp.getResult());
+
+        resp = cluster.get("/api/v1/namespaces/openunison/secrets/amq-env-secrets-orchestra");
+        assertEquals(200,resp.getResult());
+
+        IoK8sApiCoreV1Secret amqEnv = io.k8s.JSON.getGson().fromJson(resp.getBody().toJSONString(), IoK8sApiCoreV1Secret.class);
+        assertTrue(Arrays.equals("x".getBytes("UTF-8"),amqEnv.getData().get("JDBC_DRIVER")));
+        assertTrue(Arrays.equals("y".getBytes("UTF-8"),amqEnv.getData().get("JDBC_URL")));
+        assertTrue(Arrays.equals("z".getBytes("UTF-8"),amqEnv.getData().get("JDBC_USER")));
+        assertTrue(Arrays.equals("a".getBytes("UTF-8"),amqEnv.getData().get("JDBC_PASSWORD")));
+
+        // test a change to the certificate
+        cluster.delete("/api/v1/namespaces/openunison/secrets/orchestra-amq-client");
+
+        ou.getSpec().getNonSecretData().forEach((nsd) -> {
+            if (nsd.getName().equals("OU_JDBC_URL")) {
+                nsd.setValue("f");
+            }
+        });
+
+        gensecret = new Generator();
+        gensecret.load(ou,cluster,"openunison","orchestra");
+
+        System.out.println("Sleeping for two seconds");
+        Thread.sleep(2000);
+
+        resp = cluster.get("/api/v1/namespaces/openunison/secrets/orchestra-amq-client");
+        assertEquals(200,resp.getResult());
+
+        IoK8sApiCoreV1Secret newAmqClientCert = io.k8s.JSON.getGson().fromJson(resp.getBody().toJSONString(), IoK8sApiCoreV1Secret.class);
+
+        assertNotEquals(amqClientCert.getMetadata().getUid(), newAmqClientCert.getMetadata().getUid());
+
+        resp = cluster.get("/api/v1/namespaces/openunison/secrets/amq-env-secrets-orchestra");
+        assertEquals(200,resp.getResult());
+
+        amqEnv = io.k8s.JSON.getGson().fromJson(resp.getBody().toJSONString(), IoK8sApiCoreV1Secret.class);
+        assertTrue(Arrays.equals("x".getBytes("UTF-8"),amqEnv.getData().get("JDBC_DRIVER")));
+        assertTrue(Arrays.equals("f".getBytes("UTF-8"),amqEnv.getData().get("JDBC_URL")));
+        assertTrue(Arrays.equals("z".getBytes("UTF-8"),amqEnv.getData().get("JDBC_USER")));
+        assertTrue(Arrays.equals("a".getBytes("UTF-8"),amqEnv.getData().get("JDBC_PASSWORD")));
+
+        // put openunison back the way we found it
+        ou = this.loadOrchestra();
+        gensecret = new Generator();
+        gensecret.load(ou,cluster,"openunison","orchestra");
+    }
+
+    @Test
+    public void testUpdateDeployment() throws Exception {
+        
+
+        WsResponse resp = cluster.get("/api/v1/namespaces/openunison/pods?labelSelector=app%3Dopenunison-orchestra");
+        assertEquals(200,resp.getResult());
+
+        JSONArray items = ((JSONArray) resp.getBody().get("items"));
+        assertEquals(1,items.size());
+
+        io.k8s.obj.IoK8sApiCoreV1Pod orchestraDeployment = io.k8s.JSON.getGson().fromJson(items.get(0).toString(), io.k8s.obj.IoK8sApiCoreV1Pod.class);
+        String currentPodUUID = orchestraDeployment.getMetadata().getUid();
+
+        new Updater(cluster,"openunison","orchestra",false).rollout();
+
+        System.out.println("sleeping for 5 seconds");
+        Thread.sleep(5000);
+
+        boolean done = false;
+
+        int i = 0;
+
+        while (! done && i < 150) {
+            resp = cluster.get("/api/v1/namespaces/openunison/pods?labelSelector=app%3Dopenunison-orchestra");
+            assertEquals(200,resp.getResult());
+
+            items = ((JSONArray) resp.getBody().get("items"));
+            if (items.size() == 1) {
+                done = true;
+            } else {
+                Thread.sleep(1000);
+                i++;
+                System.out.println("trying " + i);
+            }
+
+        }
+
+        
+
+        orchestraDeployment = io.k8s.JSON.getGson().fromJson(items.get(0).toString(), io.k8s.obj.IoK8sApiCoreV1Pod.class);
+        String newPodUUID = orchestraDeployment.getMetadata().getUid();
+
+        assertNotEquals(newPodUUID, currentPodUUID);
+
+        assertTrue(done);
+
+
+
+
     }
 
     @Test
     public void testStaticSecretCreateNew() throws Exception {
+        
         // delete the static secret and make sure it gets created
         com.tremolosecurity.openunison.crd.OpenUnison ou = loadOrchestra();
 
@@ -85,6 +293,7 @@ public class TestOperatorComponents {
 
     @Test
     public void testStaticPatchNewVersion() throws Exception {
+        
         // delete the static secret and make sure it gets created
         com.tremolosecurity.openunison.crd.OpenUnison ou = loadOrchestra();
 
@@ -120,6 +329,7 @@ public class TestOperatorComponents {
 
     @Test
     public void testStaticDeleteRemovedSecret() throws Exception {
+        
         // delete the static secret and make sure it gets created
         com.tremolosecurity.openunison.crd.OpenUnison ou = loadOrchestra();
 
@@ -169,6 +379,7 @@ public class TestOperatorComponents {
 
     @Test
     public void testStaticAddNewSecret() throws Exception {
+        
         // delete the static secret and make sure it gets created
         com.tremolosecurity.openunison.crd.OpenUnison ou = loadOrchestra();
 
@@ -215,6 +426,7 @@ public class TestOperatorComponents {
 
     @Test
     public void testLoadObject() throws Exception {
+        
         com.tremolosecurity.openunison.crd.OpenUnison ou = loadOrchestra();
 
         assertEquals(ou.getSpec().getImage(),System.getenv("EXPECTED_IMAGE"));
@@ -334,8 +546,7 @@ public class TestOperatorComponents {
 
     private com.tremolosecurity.openunison.crd.OpenUnison loadOrchestra()
             throws Exception, URISyntaxException, IOException, InterruptedException, ParseException {
-        cluster.findVersion();
-        JSON.setGson(JSON.createGson().create());
+        init();
         
 
         SSLContext sslCtx = cluster.generateSSLContext();
@@ -361,5 +572,11 @@ public class TestOperatorComponents {
 
         com.tremolosecurity.openunison.crd.OpenUnison ou = JSON.getGson().fromJson(json.toString(), OpenUnison.class);
         return ou;
+    }
+
+    private static void init() throws Exception {
+        cluster.findVersion();
+        JSON.setGson(JSON.createGson().create());
+        Generator g = new Generator();
     }
 }

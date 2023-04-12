@@ -57,6 +57,10 @@
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
+  "name":"com.sun.crypto.provider.HmacPKCS12PBECore$HmacPKCS12PBE_SHA256",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
   "name":"com.sun.crypto.provider.PBEKeyFactory$PBEWithMD5AndDES",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
@@ -86,11 +90,13 @@
   "methods":[
     {"name":"<init>","parameterTypes":[] }, 
     {"name":"setup","parameterTypes":[] }, 
+    {"name":"testAMQSetup","parameterTypes":[] }, 
     {"name":"testLoadObject","parameterTypes":[] }, 
     {"name":"testStaticAddNewSecret","parameterTypes":[] }, 
     {"name":"testStaticDeleteRemovedSecret","parameterTypes":[] }, 
     {"name":"testStaticPatchNewVersion","parameterTypes":[] }, 
-    {"name":"testStaticSecretCreateNew","parameterTypes":[] }
+    {"name":"testStaticSecretCreateNew","parameterTypes":[] }, 
+    {"name":"testUpdateDeployment","parameterTypes":[] }
   ]
 },
 {
@@ -243,6 +249,621 @@
 },
 {
   "name":"com.tremolosecurity.openunison.crd.OpenUnisonStatusConditions",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiAdmissionregistrationV1MatchCondition",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiAdmissionregistrationV1RuleWithOperations",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiAdmissionregistrationV1ServiceReference",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhook",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhookConfiguration",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiAdmissionregistrationV1WebhookClientConfig",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiAppsV1Deployment",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiAppsV1DeploymentCondition",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiAppsV1DeploymentSpec",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiAppsV1DeploymentStatus",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiAppsV1DeploymentStrategy",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiAppsV1RollingUpdateDeployment",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1AWSElasticBlockStoreVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1Affinity",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1AzureDiskVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1AzureFileVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1CSIVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1Capabilities",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1CephFSVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1CinderVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1ClaimSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1ConfigMapEnvSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1ConfigMapKeySelector",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1ConfigMapProjection",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1ConfigMapVolumeSource",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1Container",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1ContainerPort",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1ContainerResizePolicy",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1ContainerState",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1ContainerStateRunning",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1ContainerStateTerminated",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1ContainerStateWaiting",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1ContainerStatus",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1DownwardAPIProjection",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1DownwardAPIVolumeFile",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1DownwardAPIVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1EmptyDirVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1EnvFromSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1EnvVar",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1EnvVarSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1EphemeralContainer",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1EphemeralVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1ExecAction",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1FCVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1FlexVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1FlockerVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1GCEPersistentDiskVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1GRPCAction",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1GitRepoVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1GlusterfsVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1HTTPGetAction",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1HTTPHeader",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1HostAlias",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1HostPathVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1ISCSIVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1KeyToPath",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1Lifecycle",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1LifecycleHandler",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1LocalObjectReference",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1NFSVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1NodeAffinity",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1NodeSelector",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1NodeSelectorRequirement",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1NodeSelectorTerm",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1ObjectFieldSelector",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1PersistentVolumeClaimSpec",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1PersistentVolumeClaimTemplate",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1PersistentVolumeClaimVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1PhotonPersistentDiskVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1Pod",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1PodAffinity",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1PodAffinityTerm",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1PodAntiAffinity",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1PodCondition",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1PodDNSConfig",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1PodDNSConfigOption",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1PodIP",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1PodOS",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1PodReadinessGate",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1PodResourceClaim",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1PodSchedulingGate",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1PodSecurityContext",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1PodSpec",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1PodStatus",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1PodTemplateSpec",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1PortworxVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1PreferredSchedulingTerm",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1Probe",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1ProjectedVolumeSource",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1QuobyteVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1RBDVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1ResourceClaim",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1ResourceFieldSelector",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1ResourceRequirements",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1SELinuxOptions",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1ScaleIOVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1SeccompProfile",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1Secret",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1SecretEnvSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1SecretKeySelector",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1SecretProjection",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1SecretVolumeSource",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1SecurityContext",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1ServiceAccountTokenProjection",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1StorageOSVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1Sysctl",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1TCPSocketAction",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1Toleration",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1TopologySpreadConstraint",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1TypedLocalObjectReference",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1TypedObjectReference",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1Volume",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1VolumeDevice",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1VolumeMount",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1VolumeProjection",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1VsphereVirtualDiskVolumeSource",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1WeightedPodAffinityTerm",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApiCoreV1WindowsSecurityContextOptions",
+  "allDeclaredFields":true,
+  "queriedMethods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApimachineryPkgApisMetaV1LabelSelector",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApimachineryPkgApisMetaV1LabelSelectorRequirement",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApimachineryPkgApisMetaV1ManagedFieldsEntry",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApimachineryPkgApisMetaV1ObjectMeta",
+  "allDeclaredFields":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"io.k8s.obj.IoK8sApimachineryPkgApisMetaV1OwnerReference",
   "allDeclaredFields":true,
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },

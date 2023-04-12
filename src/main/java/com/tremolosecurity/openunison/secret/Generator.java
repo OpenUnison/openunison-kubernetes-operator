@@ -11,6 +11,8 @@ import java.nio.file.Path;
 import java.security.Certificate;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
+import java.security.MessageDigest;
+import java.security.MessageDigestSpi;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
@@ -63,6 +65,7 @@ import io.k8s.JSON.SqlDateTypeAdapter;
 import io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhook;
 import io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhookConfiguration;
 import io.k8s.obj.IoK8sApimachineryPkgApisMetaV1ObjectMeta;
+import io.k8s.obj.IoK8sApiCoreV1Secret;
 
 public class Generator {
     OpenUnison ou;
@@ -81,7 +84,7 @@ public class Generator {
         this.props = new HashMap<String,String>();
     }
 
-    public void load(OpenUnison ou,ClusterConnection cluster,String namespace,String name) throws Exception {
+    public boolean load(OpenUnison ou,ClusterConnection cluster,String namespace,String name) throws Exception {
         this.ou = ou;
         this.namespace = namespace;
         this.name = name;
@@ -92,6 +95,12 @@ public class Generator {
         this.generateStaticKeys();
         this.generateOpenUnisonSecret();
         this.updateValidatingWebhookCertificate();
+
+        if (this.props.get("OPENUNISON_PROVISIONING_ENABLED") != null && this.props.get("OPENUNISON_PROVISIONING_ENABLED").equalsIgnoreCase("true")) {
+            return this.setupAmqSecrets();
+        } else {
+            return false;
+        }
     }
 
     private void generateOpenUnisonSecret() throws KeyStoreException, NoSuchAlgorithmException, CertificateException, FileNotFoundException, IOException, ParseException, InterruptedException, URISyntaxException {
@@ -609,6 +618,159 @@ public class Generator {
         }
         
 
+    }
+
+    private boolean setupAmqSecrets() throws Exception {
+        boolean updated = false;
+        if (! this.ou.getSpec().getEnableActivemq()) {
+            System.out.println("ActiveMQ not enabled, skipping");
+            return false;
+        }
+
+        System.out.println("Processing ActiveMQ Secrets");
+
+        String ksPassword = this.props.get("unisonKeystorePassword");
+
+        KeyStore amqKS = KeyStore.getInstance("PKCS12");
+        amqKS.load(null, ksPassword.toCharArray());
+
+        System.out.println("Trusting the amq-client certificate");
+        amqKS.setCertificateEntry("trusted-amq-client", this.ouKs.getCertificate("amq-client"));
+
+        WsResponse res = this.cluster.get("/api/v1/namespaces/" + this.namespace + "/secrets/" + this.name + "-amq-server");
+
+        if (res.getResult() != 200) {
+            throw new Exception("Could not load secret " + this.name + "-amq-server / " + res.getResult() + " / " + res.getBody().toJSONString());
+        }
+
+        IoK8sApiCoreV1Secret amqServerSecret = io.k8s.JSON.getGson().fromJson(res.getBody().toJSONString(), IoK8sApiCoreV1Secret.class);
+        CertUtils.importKeyPairAndCert(amqKS, ksPassword, "broker", Base64.getEncoder().encodeToString(amqServerSecret.getData().get("tls.key")), Base64.getEncoder().encodeToString(amqServerSecret.getData().get("tls.crt")));
+
+        String amqSecretUri = "/api/v1/namespaces/" + this.namespace + "/secrets/amq-secrets-" + this.name;
+        res = cluster.get(amqSecretUri);
+
+        if (res.getResult() == 200) {
+            System.out.println("AMQ Secret already exists");
+            IoK8sApiCoreV1Secret amqSecret = io.k8s.JSON.getGson().fromJson(res.getBody().toJSONString(), IoK8sApiCoreV1Secret.class);
+            
+            String b64ExistingKs = Base64.getEncoder().encodeToString(amqSecret.getData().get("amq.p12"));
+            KeyStore existingKs = CertUtils.decodeKeystore(b64ExistingKs, ksPassword);
+
+            boolean keystoresAreSame = false;
+
+            if (existingKs != null) {
+                keystoresAreSame = CertUtils.keystoresEqual(amqKS, existingKs, ksPassword);
+            }
+
+            if (keystoresAreSame) {
+                System.out.println("No changes to AMQ secret");
+            } else {
+                IoK8sApiCoreV1Secret patch = new IoK8sApiCoreV1Secret();
+                patch.setData(new HashMap<String,byte[]>());
+                patch.getData().put("amq.p12", CertUtils.encodeKeyStoreToBytes(amqKS, ksPassword));
+                res = cluster.patch(amqSecretUri, patch.toJson());
+
+                if (res.getResult() < 200 || res.getResult() >= 299) {
+                    throw new Exception("Could not patch amq secret " + amqSecretUri + " / " + res.getResult() + " / " + res.getBody().toJSONString());
+                }
+
+                System.out.println("AMQ Secret patched");
+                updated = true;
+            }
+            
+        } else {
+            String amqConfig = "";
+            if (this.props.get("ACTIVEMQ_USE_PVC") != null && this.props.get("ACTIVEMQ_USE_PVC").equalsIgnoreCase("true")) {
+                amqConfig = new String(Generator.class.getResourceAsStream("amq-pvc.xml").readAllBytes());
+            } else if (this.props.get("OU_JDBC_DRIVER") != null && this.props.get("OU_JDBC_DRIVER").equalsIgnoreCase("com.microsoft.sqlserver.jdbc.SQLServerDriver")) {
+                amqConfig = new String(Generator.class.getResourceAsStream("amq-sqlserver.xml").readAllBytes());
+            } else {
+                amqConfig = new String(Generator.class.getResourceAsStream("amq-mysql.xml").readAllBytes());
+            }
+
+            IoK8sApiCoreV1Secret amqSecret = new IoK8sApiCoreV1Secret();
+            amqSecret.metadata(
+                new IoK8sApimachineryPkgApisMetaV1ObjectMeta()
+                .name("amq-secrets-" + this.name)
+                .namespace(this.namespace)
+            )
+            .kind("Secret")
+            .type("Opaque")
+            .data(new HashMap<String,byte[]>());
+            
+            amqSecret.getData().put("activemq.xml", amqConfig.getBytes("UTF-8"));
+            amqSecret.getData().put("amq.p12",CertUtils.encodeKeyStoreToBytes(amqKS, ksPassword));
+
+            res = cluster.post("/api/v1/namespaces/" + this.namespace + "/secrets", amqSecret.toJson());
+
+            if (res.getResult() < 200 || res.getResult() > 299) {
+                throw new Exception("Could not create amq secret " + amqSecretUri + " / " + res.getResult() + " / " + res.getBody().toJSONString());
+            }
+
+            updated = true;
+
+
+        }
+
+        System.out.println("Checking activemq env var secret");
+
+        String forHash = this.props.get("OU_JDBC_DRIVER") + this.props.get("OU_JDBC_URL") + this.props.get("OU_JDBC_USER") + this.props.get("OU_JDBC_PASSWORD") + ksPassword;
+        byte[] digestSrc = forHash.getBytes("UTF-8");
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        digest.update(digestSrc, 0, digestSrc.length);
+        String newCfgDigest = java.util.Base64.getEncoder().encodeToString(digest.digest());
+
+
+        IoK8sApiCoreV1Secret amqEnvSecret = new IoK8sApiCoreV1Secret();
+        amqEnvSecret.metadata(
+                new IoK8sApimachineryPkgApisMetaV1ObjectMeta()
+                .annotations(new HashMap<String,String>())
+                
+            )   
+         
+        .data(new HashMap<String,byte[]>());    
+
+        amqEnvSecret.getMetadata().getAnnotations().put("tremolo.io/digest",newCfgDigest);
+
+        amqEnvSecret.getData().put("JDBC_DRIVER", this.props.get("OU_JDBC_DRIVER").getBytes("UTF-8"));
+        amqEnvSecret.getData().put("JDBC_URL", this.props.get("OU_JDBC_URL").getBytes("UTF-8"));
+        amqEnvSecret.getData().put("JDBC_USER", this.props.get("OU_JDBC_USER").getBytes("UTF-8"));
+        amqEnvSecret.getData().put("JDBC_PASSWORD", this.props.get("OU_JDBC_PASSWORD").getBytes("UTF-8"));
+        amqEnvSecret.getData().put("TLS_KS_PWD", ksPassword.getBytes("UTF-8"));
+        
+
+        res = cluster.get("/api/v1/namespaces/" + this.namespace + "/secrets/amq-env-secrets-" + this.name);
+
+        if (res.getResult() == 200) {
+            System.out.println("Secret exists, checking if changed");
+            IoK8sApiCoreV1Secret secretFromApiServer = io.k8s.JSON.getGson().fromJson(res.getBody().toJSONString(), IoK8sApiCoreV1Secret.class);
+            if (secretFromApiServer.getMetadata().getAnnotations() == null || ! secretFromApiServer.getMetadata().getAnnotations().get("tremolo.io/digest").equals(newCfgDigest)) {
+                System.out.println("Secret needs to be patched");
+                res = cluster.patch("/api/v1/namespaces/" + this.namespace + "/secrets/amq-env-secrets-" + this.name,amqEnvSecret.toJson());
+
+                if (res.getResult() < 200 || res.getResult() >= 299) {
+                    throw new Exception("Could not patch amq env secret " + "/api/v1/namespaces/" + this.namespace + "/secrets/amq-env-secrets-" + this.name + " / " + res.getResult() + " / " + res.getBody().toJSONString());
+                }
+
+                updated = true;
+            } else {
+                System.out.println("Secret is unchanged, skipping");
+            }
+        } else {
+            System.out.println("Creating new secret");
+            amqEnvSecret.getMetadata().setName("amq-env-secrets-" + this.name);
+            amqEnvSecret.getMetadata().setNamespace(this.namespace);
+            res = cluster.post("/api/v1/namespaces/" + this.namespace + "/secrets", amqEnvSecret.toJson());
+
+            if (res.getResult() < 200 || res.getResult() > 299) {
+                throw new Exception("Could not create amq env secret  " + res.getResult() + " / " + res.getBody().toJSONString());
+            }
+
+            updated = true;
+        }
+
+
+        return updated;
     }
 
 
