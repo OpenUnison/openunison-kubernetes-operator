@@ -25,7 +25,7 @@ public class OpenUnisonOperator {
         cluster.findVersion();
 
         if (command.equalsIgnoreCase("operator")) {
-            Operator operator = new Operator(cluster);
+            Operator operator = new Operator(cluster,10);
             operator.init();
         }
         

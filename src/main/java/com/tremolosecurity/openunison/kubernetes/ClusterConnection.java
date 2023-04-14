@@ -40,6 +40,8 @@ public class ClusterConnection {
     SSLContext sslCtx;
     HttpClient http;
 
+    String uriPath;
+
     public ClusterConnection(String url,String namespace, String pathToCert, String pathToToken,String[] versions) {
         this.url = url;
         this.namespace = namespace;
@@ -78,6 +80,7 @@ public class ClusterConnection {
         for (int i = versions.length - 1; i>= 0;i--) {
             System.out.println("Testing version " + this.versions[i]);
             String urlToTest = String.format("%s/apis/openunison.tremolo.io/v%s/namespaces/%s/openunisons",this.url,versions[i],this.namespace);
+            this.uriPath = String.format("/apis/openunison.tremolo.io/v%s/namespaces/%s/openunisons",versions[i],this.namespace);
             System.out.println("URL: " + urlToTest); 
 
             HttpRequest get = HttpRequest.newBuilder()
@@ -217,5 +220,8 @@ public class ClusterConnection {
         return wsresp;
     }
 
+    public String getUriPath() {
+        return uriPath;
+    }
     
 }
