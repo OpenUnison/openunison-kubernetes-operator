@@ -54,6 +54,7 @@ import com.tremolosecurity.openunison.kubernetes.ClusterConnection;
 import com.tremolosecurity.openunison.obj.CertificateData;
 import com.tremolosecurity.openunison.obj.WsResponse;
 import com.tremolosecurity.openunison.obj.X509Data;
+import com.tremolosecurity.openunison.sql.RunSQL;
 import com.tremolosecurity.openunison.util.CertUtils;
 import com.tremolosecurity.openunison.util.NetUtils;
 
@@ -97,6 +98,12 @@ public class Generator {
         this.updateValidatingWebhookCertificate();
 
         if (this.props.get("OPENUNISON_PROVISIONING_ENABLED") != null && this.props.get("OPENUNISON_PROVISIONING_ENABLED").equalsIgnoreCase("true")) {
+            RunSQL runSQL = new RunSQL();
+            if (ou.getSpec().getRunSql() != null && ! ou.getSpec().getRunSql().isBlank()) {
+                System.out.println("Found SQL");
+                runSQL.runSQL(this.ou, this);
+            }
+            
             return this.setupAmqSecrets();
         } else {
             return false;
