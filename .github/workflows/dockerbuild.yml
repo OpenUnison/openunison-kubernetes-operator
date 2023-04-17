@@ -49,6 +49,7 @@ jobs:
         with:
           push: true
           file: src/main/docker/Dockerfile
+          context: /home/runner/work/openunison-kubernetes-operator/openunison-kubernetes-operator
           tags: |
             docker.io/${{ secrets.OU_CONTAINER_REPO }}/openunison-kubernetes-operator
             ghcr.io/${{ env.REPO }}:latest
