@@ -1,5 +1,6 @@
 package com.tremolosecurity.openunison.command;
 
+import com.tremolosecurity.openunison.certs.CheckCerts;
 import com.tremolosecurity.openunison.kubernetes.ClusterConnection;
 import com.tremolosecurity.openunison.operator.Operator;
 
@@ -34,6 +35,10 @@ public class OpenUnisonOperator {
                 System.out.println("Problem running watch, restarting");
                 t.printStackTrace();
             }
+        } else if (command.equalsIgnoreCase("check-certs")) {
+            System.out.println("Checking certificats in namespace");
+            CheckCerts checkCerts = new CheckCerts();
+            checkCerts.checkCerts(cluster);
         }
         
     }

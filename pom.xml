@@ -302,6 +302,11 @@
                     <version>5.9.2</version>
                 </dependency>
             </dependencies>
+            <configuration>
+              <argLine>
+                --add-opens java.base/java.time=ALL-UNNAMED
+              </argLine>
+            </configuration>
         </plugin>
           <plugin>
             <groupId>org.graalvm.buildtools</groupId>
