@@ -595,7 +595,8 @@ public class Generator {
 
         
 
-        byte[] unisonCertBytes = unisonCert.getEncoded();
+        byte[] unisonCertBytes = CertUtils.exportCert((X509Certificate) unisonCert).getBytes("UTF-8");
+        
 
         String fromSecretCertBase64 = java.util.Base64.getEncoder().encodeToString(CertUtils.exportCert((X509Certificate) unisonCert).getBytes("UTF-8"));
         
