@@ -193,7 +193,21 @@ public class Operator {
 
                         }
                     } else if (type.equalsIgnoreCase("DELETED")) {
+                        this.processedResources.add(resourceVersion);
+                        
+                        com.tremolosecurity.openunison.crd.OpenUnison ou = JSON.getGson().fromJson(obj.toString(), OpenUnison.class);
 
+                        try {
+
+                            Generator gensecret = new Generator();
+                            gensecret.deleteSecrets(ou,cluster,(String) metadata.get("name"));
+                            
+                        } catch (Throwable t) {
+                            System.out.println("Could not process request:");
+                            t.printStackTrace();
+                            
+
+                        }
                     } else if (type.equalsIgnoreCase("BOOKMARK")) {
                         // do nothing, we already have the resource version
                     } else if (type.equalsIgnoreCase("ERROR")) {

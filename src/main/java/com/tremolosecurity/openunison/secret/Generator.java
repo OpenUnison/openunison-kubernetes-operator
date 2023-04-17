@@ -773,6 +773,61 @@ public class Generator {
         return updated;
     }
 
+    public void deleteSecrets(OpenUnison ou, ClusterConnection cluster,String name) throws Exception {
+        this.ou = ou;
+        this.cluster = cluster;
+        this.namespace = cluster.getNamespace();
+        this.name = name;
+        this.loadPropertiesFromCrd();
+        String ksPassword = this.props.get("unisonKeystorePassword");
+        boolean skipWriteToSecret = this.props.get("openunison.static-secret.skip_write") != null && this.props.get("openunison.static-secret.skip_write").equals("true");
+        String secretSuffix = this.props.get("openunison.static-secret.suffix");
+
+        if (skipWriteToSecret) {
+            System.out.println("openunison.static-secret.skip_write is true, not deleting anything");
+            return;
+        }
+
+        if (secretSuffix == null) {
+            secretSuffix = "";
+        }
+
+
+        
+
+
+
+        String uri = "/api/v1/namespaces/" + cluster.getNamespace() + "/secrets/" + this.name + secretSuffix;
+        System.out.println("Deleting " + uri);
+        cluster.delete(uri);
+
+        uri = "/api/v1/namespaces/" + this.namespace + "/secrets/" + this.name + "-static-keys" + secretSuffix;
+        System.out.println("Deleting " + uri);
+        cluster.delete(uri);
+
+        for (OpenUnisonSpecKeyStoreKeyPairsKeysInner keySpec : ou.getSpec().getKeyStore().getKeyPairs().getKeys()) {
+            System.out.println(keySpec.getName());
+
+            if (keySpec.getCreateData() != null) {
+                System.out.println("Has key");
+                String secretName = keySpec.getName();
+                if (keySpec.getTlsSecretName() != null && ! keySpec.getTlsSecretName().isBlank()) {
+                    secretName = keySpec.getTlsSecretName();
+                }
+
+                String namespace = this.namespace;
+                if (keySpec.getCreateData().getTargetNamespace() != null && ! keySpec.getCreateData().getTargetNamespace().isBlank()) {
+                    namespace = keySpec.getCreateData().getTargetNamespace();
+                }
+
+                uri = "/api/v1/namespaces/" + namespace + "/secrets/" + secretName + secretSuffix;
+                System.out.println("Deleting " + uri);
+                cluster.delete(uri);
+
+            }
+        }
+    }
+
 
     private static DateTypeAdapter dateTypeAdapter = new DateTypeAdapter();
     private static SqlDateTypeAdapter sqlDateTypeAdapter = new SqlDateTypeAdapter();

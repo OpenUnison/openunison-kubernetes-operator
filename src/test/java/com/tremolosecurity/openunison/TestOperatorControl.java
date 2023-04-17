@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import java.util.UUID;
 
 import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -25,6 +26,121 @@ public class TestOperatorControl {
     }
 
     
+
+
+    @Test
+    public void testDelete() throws Exception {
+        // first shutdown the operator if its running
+        boolean operatorRunning = false;
+        WsResponse resp = cluster.get("/apis/apps/v1/namespaces/openunison/deployments/openunison-operator");
+        if (resp.getResult() == 200) {
+            operatorRunning = true;
+            String patch = "{\"spec\":{\"replicas\":0}}";
+            resp = cluster.patch("/apis/apps/v1/namespaces/openunison/deployments/openunison-operator", patch);
+            
+            int numTries = 0;
+            boolean done = false;
+            while (! done) {
+                resp = cluster.get("/api/v1/namespaces/openunison/pods?labelSelector=app%3Dopenunison-operator");
+                JSONArray items = (JSONArray) resp.getBody().get("items");
+                if (items.size() != 0)  {
+                    if (numTries >= 150) {
+                        throw new Exception("Timeout waiting for operator to stop");
+                    }
+                    Thread.sleep(1000);
+                    numTries++;
+                    System.out.println("waiting for operator to stop: " + numTries);
+                } else {
+                    done = true;
+                }
+            }
+        }
+
+        resp = cluster.get("/apis/openunison.tremolo.io/v6/namespaces/openunison/openunisons/orchestra");
+        assertEquals(200,resp.getResult());
+
+        assertEquals(200,cluster.get("/api/v1/namespaces/openunison/secrets/orchestra").getResult());
+        assertEquals(200,cluster.get("/api/v1/namespaces/openunison/secrets/orchestra-static-keys").getResult());
+        assertEquals(200,cluster.get("/api/v1/namespaces/openunison/secrets/unison-tls").getResult());
+        assertEquals(200,cluster.get("/api/v1/namespaces/openunison/secrets/unison-saml2-rp-sig").getResult());
+        assertEquals(200,cluster.get("/api/v1/namespaces/openunison/secrets/remote-k8s-idp-sig").getResult());
+
+
+        resp.getBody().remove("status");
+        ((JSONObject)resp.getBody().get("metadata")).remove("resourceVersion");
+        ((JSONObject)resp.getBody().get("metadata")).remove("uid");
+
+
+        Operator operator = new Operator(cluster,5);
+        operator.init();
+
+        new Thread() {
+            @Override
+            public void run() {
+                try {
+                    operator.runWatch();
+                } catch (Exception e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            }
+        }.start();
+
+
+        JSONObject ouobj = resp.getBody();
+        resp = cluster.delete("/apis/openunison.tremolo.io/v6/namespaces/openunison/openunisons/orchestra");
+        assertEquals(200,resp.getResult());
+
+        System.out.println("Waiting a few seconds");
+        Thread.sleep(5000);
+
+        // make checks
+        assertEquals(404,cluster.get("/api/v1/namespaces/openunison/secrets/orchestra").getResult());
+        assertEquals(404,cluster.get("/api/v1/namespaces/openunison/secrets/orchestra-static-keys").getResult());
+        assertEquals(404,cluster.get("/api/v1/namespaces/openunison/secrets/unison-tls").getResult());
+        assertEquals(404,cluster.get("/api/v1/namespaces/openunison/secrets/unison-saml2-rp-sig").getResult());
+        assertEquals(404,cluster.get("/api/v1/namespaces/openunison/secrets/remote-k8s-idp-sig").getResult());
+        
+
+
+
+        // cleanup
+        resp = cluster.post("/apis/openunison.tremolo.io/v6/namespaces/openunison/openunisons", ouobj.toJSONString());
+        assertEquals(201,resp.getResult());
+
+
+
+
+
+
+        int numTries = 0;
+        boolean done = false;
+        while (! done) {
+            resp = cluster.get("/api/v1/namespaces/openunison/pods?labelSelector=app%3Dopenunison-orchestra");
+            JSONArray items = (JSONArray) resp.getBody().get("items");
+            if (items.size() != 1)  {
+                if (numTries >= 150) {
+                    throw new Exception("Timeout waiting for openunison to start");
+                }
+                Thread.sleep(1000);
+                numTries++;
+                System.out.println("waiting for openunison to start: " + numTries);
+            } else {
+                done = true;
+            }
+        }
+
+        if (operatorRunning) {
+            String patch = "{\"spec\":{\"replicas\":1}}";
+            resp = cluster.patch("/apis/apps/v1/namespaces/openunison/deployments/openunison-operator", patch);
+            
+            
+        }
+
+    }
+
+
+
     @Test
     public void testOperatorNew() throws Exception {
 

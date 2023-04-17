@@ -27,6 +27,13 @@ public class OpenUnisonOperator {
         if (command.equalsIgnoreCase("operator")) {
             Operator operator = new Operator(cluster,10);
             operator.init();
+
+            try {
+                operator.runWatch();
+            } catch (Throwable t) {
+                System.out.println("Problem running watch, restarting");
+                t.printStackTrace();
+            }
         }
         
     }
