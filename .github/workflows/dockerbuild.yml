@@ -14,8 +14,9 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 17
-      - name: Build with Maven
-        run: mvn clean package --file pom.xml -DskipTests
+      
+
+      
       -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v1
@@ -42,6 +43,9 @@ jobs:
           username: ${{ secrets.OU_REG_USER }}
           password: ${{ secrets.OU_REG_PASSWORD }}
 
+      - name: Build with Maven
+        run: mvn clean package --file pom.xml -DskipTests
+      
       -
         name: Build and push
         id: docker_build
