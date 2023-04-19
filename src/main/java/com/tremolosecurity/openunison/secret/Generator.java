@@ -595,10 +595,11 @@ public class Generator {
 
         
 
-        byte[] unisonCertBytes = CertUtils.exportCert((X509Certificate) unisonCert).getBytes("UTF-8");
+        String unisonTlsPem = CertUtils.exportCert((X509Certificate) unisonCert);
+        byte[] unisonCertBytes = unisonTlsPem.getBytes("UTF-8");
         
 
-        String fromSecretCertBase64 = java.util.Base64.getEncoder().encodeToString(CertUtils.exportCert((X509Certificate) unisonCert).getBytes("UTF-8"));
+        String fromSecretCertBase64 = java.util.Base64.getEncoder().encodeToString(unisonCertBytes);
         
         io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhookConfiguration webHookObj = io.k8s.JSON.getGson().fromJson(resp.getBody().toString(),IoK8sApiAdmissionregistrationV1ValidatingWebhookConfiguration.class);
 

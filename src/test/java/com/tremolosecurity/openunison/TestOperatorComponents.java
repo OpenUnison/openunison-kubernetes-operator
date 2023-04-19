@@ -541,8 +541,10 @@ public class TestOperatorComponents {
         io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhookConfiguration webHookObj = io.k8s.JSON.getGson().fromJson(resp.getBody().toString(),IoK8sApiAdmissionregistrationV1ValidatingWebhookConfiguration.class);
 
         for (IoK8sApiAdmissionregistrationV1ValidatingWebhook wh : webHookObj.getWebhooks()) {
-            assertFalse(Arrays.equals(origUnisonTls,wh.getClientConfig().getCaBundle()),wh.getName());
-            assertTrue(Arrays.equals(newUnisonTls,wh.getClientConfig().getCaBundle()),wh.getName());
+            byte[] certFromWh = CertUtils.pem2cert(new String(wh.getClientConfig().getCaBundle())).getEncoded();
+            
+            assertFalse(Arrays.equals(origUnisonTls,certFromWh),wh.getName());
+            assertTrue(Arrays.equals(newUnisonTls,certFromWh),wh.getName());
         }
         
 
