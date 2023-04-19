@@ -78,7 +78,8 @@ public class CheckCerts {
                     try {
                         WsResponse wresp = cluster.getSecret(knamespace, kname);
                         if (wresp.getResult() == 404) {
-                            System.out.println("Not found, skipping");
+                            System.out.println("Not found, forcing updates");
+                            needToPatch = true;
                             
                         } else if (wresp.getResult() != 200) {
                             System.out.println("Secret not found " + wresp.getResult() + " / " + wresp.getBody().toJSONString());
@@ -164,8 +165,14 @@ public class CheckCerts {
                     
                     WsResponse presp = cluster.patch(patchUri, json);
                     if (presp.getResult() < 200 || presp.getResult() > 299) {
-                        System.out.println("Could not patch " + presp.getResult() + " / " + presp.getBody().toString());
-                    }
+                        if (presp.getResult() == 409) {
+                            System.out.println("Retrying...");
+                            presp = cluster.patch(patchUri, json);
+                            System.out.println("Response on retry: " + presp.getResult() + " / " + presp.getBody().toJSONString());
+                        } else {
+                            System.out.println("Could not patch " + presp.getResult() + " / " + presp.getBody().toString());
+                        }
+                    } 
                 }
             }
         }
