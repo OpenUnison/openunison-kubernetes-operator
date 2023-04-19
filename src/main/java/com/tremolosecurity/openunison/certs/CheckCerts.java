@@ -28,7 +28,7 @@ import io.k8s.obj.IoK8sApiCoreV1Secret;
 
 public class CheckCerts {
     public void checkCerts(ClusterConnection cluster) throws Exception {
-        
+        com.tremolosecurity.openunison.JSON.setGson(com.tremolosecurity.openunison.JSON.createGson().create());
         SSLContext sslCtx = cluster.generateSSLContext();
         HttpClient http = HttpClient.newBuilder()
                             .sslContext(sslCtx)
