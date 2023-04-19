@@ -160,10 +160,12 @@ public class CheckCerts {
                     pmetadata.put("annotations",pannotations);
                     pannotations.put("tremolo.io/cert-manager", DateTime.now().toString());
 
+                    String patchJson = proot.toJSONString();
+
                     String patchUri = cluster.getUriPath() + "/" + name;
                     System.out.println("Forcing update with patch to " + patchUri);
                     
-                    WsResponse presp = cluster.patch(patchUri, json);
+                    WsResponse presp = cluster.patch(patchUri, patchJson);
                     if (presp.getResult() < 200 || presp.getResult() > 299) {
                         if (presp.getResult() == 409) {
                             System.out.println("Retrying...");
