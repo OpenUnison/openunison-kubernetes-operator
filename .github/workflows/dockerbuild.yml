@@ -78,8 +78,8 @@ jobs:
 
       - name: sign images
         run: |-
-          COSIGN_EXPERIMENTAL=1 cosign sign docker.io/${{ secrets.OU_CONTAINER_REPO }}/openunison-kubernetes-operator:${{ env.TAG }}
-          COSIGN_EXPERIMENTAL=1 cosign sign ghcr.io/${{ env.REPO }}:${{ env.TAG }}
+          COSIGN_EXPERIMENTAL=1 cosign sign -y docker.io/${{ secrets.OU_CONTAINER_REPO }}/openunison-kubernetes-operator:${{ env.TAG }}
+          COSIGN_EXPERIMENTAL=1 cosign sign -y ghcr.io/${{ env.REPO }}:${{ env.TAG }}
 
       
       
