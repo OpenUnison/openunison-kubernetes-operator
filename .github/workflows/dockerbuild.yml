@@ -28,6 +28,13 @@ jobs:
       
       - name: Build with Maven
         run: mvn clean package --file pom.xml -DskipTests
+
+      - name: generate tag
+        run: |-
+          export PROJ_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "Project Version: $PROJ_VERSION"
+          echo "TAG=$PROJ_VERSION-$GITHUB_SHA" >> $GITHUB_ENV
+
       
       - name: Login to container Registry
         uses: docker/login-action@v2
@@ -58,8 +65,10 @@ jobs:
           file: src/main/docker/Dockerfile
           context: /home/runner/work/openunison-kubernetes-operator/openunison-kubernetes-operator
           tags: |
-            docker.io/${{ secrets.OU_CONTAINER_REPO }}/openunison-kubernetes-operator
+            docker.io/${{ secrets.OU_CONTAINER_REPO }}/openunison-kubernetes-operator:latest
+            docker.io/${{ secrets.OU_CONTAINER_REPO }}/openunison-kubernetes-operator:${{ env.TAG }}
             ghcr.io/${{ env.REPO }}:latest
+            ghcr.io/${{ env.REPO }}:${{ env.TAG }}
 
       
       
