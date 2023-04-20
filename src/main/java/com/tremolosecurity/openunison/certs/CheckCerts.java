@@ -89,7 +89,8 @@ public class CheckCerts {
                             JSONObject smetadata = (JSONObject) wresp.getBody().get("metadata");
                             JSONObject slabels = (JSONObject) smetadata.get("labels");
 
-                            if (slabels != null && slabels.get("operated-by") != null && ((String) slabels.get("operated-by")).equalsIgnoreCase("openunison-operator")) {
+                            
+                            if ((keyData.getReplaceIfExists() != null && keyData.getReplaceIfExists()) || (slabels != null && slabels.get("operated-by") != null && ((String) slabels.get("operated-by")).equalsIgnoreCase("openunison-operator"))) {
 
 
                                 String certName = "tls.crt";
