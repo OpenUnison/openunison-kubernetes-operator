@@ -71,14 +71,13 @@ jobs:
           file: src/main/docker/Dockerfile
           context: /home/runner/work/openunison-kubernetes-operator/openunison-kubernetes-operator
           tags: |
-            docker.io/${{ secrets.OU_CONTAINER_REPO }}/openunison-kubernetes-operator:latest
             docker.io/${{ secrets.OU_CONTAINER_REPO }}/openunison-kubernetes-operator:${{ env.TAG }}
             docker.io/${{ secrets.OU_CONTAINER_REPO }}/openunison-kubernetes-operator:${{ env.SHORT_TAG }}
-          
+            docker.io/${{ secrets.OU_CONTAINER_REPO }}/openunison-kubernetes-operator:latest
 
-            ghcr.io/${{ env.REPO }}:latest
             ghcr.io/${{ env.REPO }}:${{ env.TAG }}
             ghcr.io/${{ env.REPO }}:${{ env.SHORT_TAG }}
+            ghcr.io/${{ env.REPO }}:latest
 
 
       - name: sign images
