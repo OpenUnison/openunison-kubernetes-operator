@@ -85,5 +85,21 @@ jobs:
           COSIGN_EXPERIMENTAL=1 cosign sign -y docker.io/${{ secrets.OU_CONTAINER_REPO }}/openunison-kubernetes-operator:${{ env.TAG }}
           COSIGN_EXPERIMENTAL=1 cosign sign -y ghcr.io/${{ env.REPO }}:${{ env.TAG }}
 
+      - uses: anchore/sbom-action@v0
+        with:
+          image: docker.io/${{ secrets.OU_CONTAINER_REPO }}/openunison-kubernetes-operator:${{ env.TAG }}
+          format: spdx
+          output-file: /tmp/spdxd
+
+      - uses: anchore/sbom-action@v0
+        with:
+          image: ghcr.io/${{ env.REPO }}:${{ env.TAG }}
+          format: spdx
+          output-file: /tmp/spdxg
+
+      - name: attach sbom to images
+        run: |-
+          COSIGN_EXPERIMENTAL=1 cosign attach sbom --sbom /tmp/spdxd docker.io/${{ secrets.OU_CONTAINER_REPO }}/openunison-kubernetes-operator:${{ env.TAG }}
+          COSIGN_EXPERIMENTAL=1 cosign attach sbom --sbom /tmp/spdxg ghcr.io/${{ env.REPO }}:${{ env.TAG }}
       
       
