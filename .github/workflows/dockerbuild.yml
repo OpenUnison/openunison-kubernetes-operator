@@ -39,6 +39,7 @@ jobs:
           export PROJ_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
           echo "Project Version: $PROJ_VERSION"
           echo "TAG=$PROJ_VERSION-$(echo $GITHUB_SHA | cut -c 1-6)" >> $GITHUB_ENV
+          echo "SHORT_TAG=$PROJ_VERSION >> $GITHUB_ENV"
 
       
       - name: Login to container Registry
@@ -72,8 +73,12 @@ jobs:
           tags: |
             docker.io/${{ secrets.OU_CONTAINER_REPO }}/openunison-kubernetes-operator:latest
             docker.io/${{ secrets.OU_CONTAINER_REPO }}/openunison-kubernetes-operator:${{ env.TAG }}
+            docker.io/${{ secrets.OU_CONTAINER_REPO }}/openunison-kubernetes-operator:${{ env.SHORT_TAG }}
+          
+
             ghcr.io/${{ env.REPO }}:latest
             ghcr.io/${{ env.REPO }}:${{ env.TAG }}
+            ghcr.io/${{ env.REPO }}:${{ env.SHORT_TAG }}
 
 
       - name: sign images
