@@ -38,7 +38,7 @@ jobs:
         run: |-
           export PROJ_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
           echo "Project Version: $PROJ_VERSION"
-          echo "TAG=$PROJ_VERSION-$GITHUB_SHA" >> $GITHUB_ENV
+          echo "TAG=$PROJ_VERSION-$(echo $GITHUB_SHA | cut -c 1-6)" >> $GITHUB_ENV
 
       
       - name: Login to container Registry
