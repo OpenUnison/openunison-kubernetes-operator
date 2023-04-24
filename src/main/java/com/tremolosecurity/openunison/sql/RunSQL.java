@@ -27,10 +27,30 @@ public class RunSQL {
             throw new Exception("No SQL Check set");
         }
         
-        String driver = secret.getProps().get("JDBC_DRIVER");
-        String url = secret.getProps().get("JDBC_URL");
-        String user = secret.getProps().get("JDBC_USER");
-        String password = secret.getProps().get("JDBC_PASSWORD");
+        String driver = secret.getProps().get("OU_JDBC_DRIVER");
+        
+        if (driver == null) {
+            throw new Exception("jdbc driver is missing");
+        }
+        
+        String url = secret.getProps().get("OU_JDBC_URL");
+
+        if (url == null) {
+            throw new Exception("jdbc url is missing");
+        }
+
+
+        String user = secret.getProps().get("OU_JDBC_USER");
+
+        if (user == null) {
+            System.out.println("WARN: jdbc user is missing");
+        }
+
+        String password = secret.getProps().get("OU_JDBC_PASSWORD");
+
+        if (password == null) {
+            System.out.println("WARN: jdbc password is missing");
+        }
 
         Class.forName(driver);
         Connection con = null;
