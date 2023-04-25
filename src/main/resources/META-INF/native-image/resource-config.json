@@ -1,0 +1,21 @@
+{
+  "resources":{
+  "includes":[
+    {
+      "pattern":"\\QMETA-INF/services/org.junit.platform.engine.TestEngine\\E"
+    }, 
+    {
+      "pattern":"\\QMETA-INF/services/org.junit.platform.launcher.TestExecutionListener\\E"
+    }, 
+    {
+      "pattern":"\\Qcom/tremolosecurity/openunison/secret/amq-mysql.xml\\E"
+    }, 
+    {
+      "pattern":"\\Qorg/joda/time/tz/data/America/New_York\\E"
+    }, 
+    {
+      "pattern":"\\Qorg/joda/time/tz/data/ZoneInfoMap\\E"
+    }
+  ]},
+  "bundles":[]
+}
