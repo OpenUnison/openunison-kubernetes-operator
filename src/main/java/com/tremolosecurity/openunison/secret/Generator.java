@@ -248,6 +248,7 @@ public class Generator {
                 dataPatch.put(staticKey.getName(), keyObj.toString().getBytes("UTF-8"));
             } else {
                 System.out.println("Keeping unchanged");
+                CertUtils.storeKey(ouKs, staticKey.getName(), ksPassword, (String) staticKeyFromAPI.get("key_data"));
                 dataPatch.put(staticKey.getName(), staticKeyFromAPI.toString().getBytes("UTF-8"));
 
             }
