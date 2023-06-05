@@ -7,7 +7,7 @@
 
   <groupId>com.tremolosecurity.openunison</groupId>
   <artifactId>operator</artifactId>
-  <version>1.0.1</version>
+  <version>1.0.2</version>
 
   <name>openunison-kubernetes-operator</name>
 
