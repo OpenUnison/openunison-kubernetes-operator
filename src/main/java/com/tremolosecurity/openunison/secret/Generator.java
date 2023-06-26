@@ -644,8 +644,8 @@ public class Generator {
         KeyStore amqKS = KeyStore.getInstance("PKCS12");
         amqKS.load(null, ksPassword.toCharArray());
 
-        //System.out.println("Trusting the amq-client certificate");
-        //amqKS.setCertificateEntry("trusted-amq-client", this.ouKs.getCertificate("amq-client"));
+        System.out.println("Trusting the amq-client certificate");
+        amqKS.setCertificateEntry("trusted-amq-client", this.ouKs.getCertificate("amq-client"));
 
         WsResponse res = this.cluster.get("/api/v1/namespaces/" + this.namespace + "/secrets/" + this.name + "-amq-server");
 
@@ -663,7 +663,7 @@ public class Generator {
         }
 
         IoK8sApiCoreV1Secret amqClientSecret = io.k8s.JSON.getGson().fromJson(res.getBody().toJSONString(), IoK8sApiCoreV1Secret.class);
-        CertUtils.importKeyPairAndCert(amqKS, ksPassword, "trusted-amq-client", Base64.getEncoder().encodeToString(amqServerSecret.getData().get("tls.key")), Base64.getEncoder().encodeToString(amqServerSecret.getData().get("tls.crt")));
+        CertUtils.importKeyPairAndCert(amqKS, ksPassword, "key-amq-client", Base64.getEncoder().encodeToString(amqClientSecret.getData().get("tls.key")), Base64.getEncoder().encodeToString(amqClientSecret.getData().get("tls.crt")));
 
 
         String amqSecretUri = "/api/v1/namespaces/" + this.namespace + "/secrets/amq-secrets-" + this.name;
