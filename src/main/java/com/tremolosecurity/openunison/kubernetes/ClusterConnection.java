@@ -123,11 +123,17 @@ public class ClusterConnection {
         String tmppass = UUID.randomUUID().toString();
 
         String certPem = Files.readString(Path.of(this.pathToCert));
-        X509Certificate cert = CertUtils.pem2cert(certPem);
+
+
+        
+
+        
         KeyStore ks = KeyStore.getInstance("PKCS12");
         ks.load(null,tmppass.toCharArray());
 
-        ks.setCertificateEntry("k8s-api-server", cert);
+        CertUtils.importCertificate(ks, tmppass, "k8s-api-server", certPem);
+
+        
 
         KeyManagerFactory kmf = KeyManagerFactory.getInstance("PKIX");
         kmf.init(ks, tmppass.toCharArray());
