@@ -7,7 +7,7 @@
 
   <groupId>com.tremolosecurity.openunison</groupId>
   <artifactId>operator</artifactId>
-  <version>1.0.2</version>
+  <version>1.0.3</version>
 
   <name>openunison-kubernetes-operator</name>
 
@@ -35,7 +35,7 @@
     <javax-annotations.version>1.2</javax-annotations.version>
     <jsr305.version>3.0.2</jsr305.version>
     <gson-fire.version>1.8.5</gson-fire.version>
-    <okio.version>3.3.0</okio.version>
+    <okio.version>3.4.0</okio.version>
     <postgres.version>42.5.0</postgres.version>
     <mariadb.version>3.1.3</mariadb.version>
     <mysql.version>8.0.33</mysql.version>
