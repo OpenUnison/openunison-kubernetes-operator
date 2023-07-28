@@ -656,16 +656,6 @@ public class Generator {
         IoK8sApiCoreV1Secret amqServerSecret = io.k8s.JSON.getGson().fromJson(res.getBody().toJSONString(), IoK8sApiCoreV1Secret.class);
         CertUtils.importKeyPairAndCert(amqKS, ksPassword, "broker", Base64.getEncoder().encodeToString(amqServerSecret.getData().get("tls.key")), Base64.getEncoder().encodeToString(amqServerSecret.getData().get("tls.crt")));
 
-        res = this.cluster.get("/api/v1/namespaces/" + this.namespace + "/secrets/" + this.name + "-amq-client");
-
-        if (res.getResult() != 200) {
-            throw new Exception("Could not load secret " + this.name + "-amq-amq-client / " + res.getResult() + " / " + res.getBody().toJSONString());
-        }
-
-        IoK8sApiCoreV1Secret amqClientSecret = io.k8s.JSON.getGson().fromJson(res.getBody().toJSONString(), IoK8sApiCoreV1Secret.class);
-        CertUtils.importKeyPairAndCert(amqKS, ksPassword, "key-amq-client", Base64.getEncoder().encodeToString(amqClientSecret.getData().get("tls.key")), Base64.getEncoder().encodeToString(amqClientSecret.getData().get("tls.crt")));
-
-
         String amqSecretUri = "/api/v1/namespaces/" + this.namespace + "/secrets/amq-secrets-" + this.name;
         res = cluster.get(amqSecretUri);
 
