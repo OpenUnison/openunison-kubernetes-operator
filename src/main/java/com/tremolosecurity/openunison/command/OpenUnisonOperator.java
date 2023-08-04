@@ -36,7 +36,7 @@ public class OpenUnisonOperator {
         
 
         if (webhooks.contains("/")) {
-            String validators = webhooks.substring(webhooks.indexOf("/"));
+            String validators = webhooks.substring(0,webhooks.indexOf("/"));
             String mutators = webhooks.substring(webhooks.indexOf("/") + 1);
 
             StringTokenizer toker = new StringTokenizer(validators,",",false);
