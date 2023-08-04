@@ -147,7 +147,7 @@ public class TestOperatorComponents {
 
 
         Generator gensecret = new Generator();
-        gensecret.load(ou,cluster,"openunison","orchestra");
+        gensecret.load(ou,cluster,"openunison","orchestra",new ArrayList<String>(),new ArrayList<String>());
 
         System.out.println("Sleeping for two seconds");
         Thread.sleep(2000);
@@ -182,7 +182,7 @@ public class TestOperatorComponents {
         });
 
         gensecret = new Generator();
-        gensecret.load(ou,cluster,"openunison","orchestra");
+        gensecret.load(ou,cluster,"openunison","orchestra",new ArrayList<String>(),new ArrayList<String>());
 
         System.out.println("Sleeping for two seconds");
         Thread.sleep(2000);
@@ -206,7 +206,7 @@ public class TestOperatorComponents {
         // put openunison back the way we found it
         ou = this.loadOrchestra();
         gensecret = new Generator();
-        gensecret.load(ou,cluster,"openunison","orchestra");
+        gensecret.load(ou,cluster,"openunison","orchestra",new ArrayList<String>(),new ArrayList<String>());
     }
 
     @Test
@@ -274,7 +274,7 @@ public class TestOperatorComponents {
         assertEquals(404,resp.getResult());
 
         Generator gensecret = new Generator();
-        gensecret.load(ou,cluster,"openunison","orchestra");
+        gensecret.load(ou,cluster,"openunison","orchestra",new ArrayList<String>(),new ArrayList<String>());
 
         System.out.println("Sleeping for 3 seconds");
         Thread.sleep(3000);
@@ -317,7 +317,7 @@ public class TestOperatorComponents {
         }
 
         Generator gensecret = new Generator();
-        gensecret.load(ou,cluster,"openunison","orchestra");
+        gensecret.load(ou,cluster,"openunison","orchestra",new ArrayList<String>(),new ArrayList<String>());
 
         System.out.println("Sleeping for 3 seconds");
         Thread.sleep(3000);
@@ -361,7 +361,7 @@ public class TestOperatorComponents {
         ou.getSpec().getKeyStore().getStaticKeys().remove(lastmilekey);
 
         Generator gensecret = new Generator();
-        gensecret.load(ou,cluster,"openunison","orchestra");
+        gensecret.load(ou,cluster,"openunison","orchestra",new ArrayList<String>(),new ArrayList<String>());
 
         System.out.println("Sleeping for 3 seconds");
         Thread.sleep(3000);
@@ -408,7 +408,7 @@ public class TestOperatorComponents {
         ou.getSpec().getKeyStore().getStaticKeys().add(lastmilexkey);
 
         Generator gensecret = new Generator();
-        gensecret.load(ou,cluster,"openunison","orchestra");
+        gensecret.load(ou,cluster,"openunison","orchestra",new ArrayList<String>(),new ArrayList<String>());
 
         System.out.println("Sleeping for 3 seconds");
         Thread.sleep(3000);
@@ -483,7 +483,7 @@ public class TestOperatorComponents {
         
 
         Generator gensecret = new Generator();
-        gensecret.load(ou,cluster,"openunison","orchestra");
+        gensecret.load(ou,cluster,"openunison","orchestra",new ArrayList<String>(),new ArrayList<String>());
 
         System.out.println("Sleeping for 3 seconds");
         Thread.sleep(3000);

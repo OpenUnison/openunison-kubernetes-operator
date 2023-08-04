@@ -14,7 +14,9 @@ import java.net.http.HttpResponse.BodyHandlers;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.ParseException;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 
 import javax.net.ssl.SSLContext;
 
@@ -39,10 +41,16 @@ public class Operator {
     private boolean continueWatch;
     int timeoutSeconds;
 
-    public Operator(ClusterConnection cluster,int timeoutSeconds) {
+
+    List<String> mutationHooks;
+    List<String> admmissionHooks;
+
+    public Operator(ClusterConnection cluster,int timeoutSeconds, List<String> admmissionHooks, List<String> mutationHooks) {
         this.cluster = cluster;
         this.processedResources = new HashSet<String>();
         this.timeoutSeconds = timeoutSeconds;
+        this.admmissionHooks = admmissionHooks;
+        this.mutationHooks = mutationHooks;
     }
 
     public void init() throws Exception {
@@ -265,7 +273,7 @@ public class Operator {
 
     private void processObject(com.tremolosecurity.openunison.crd.OpenUnison ou,String name) throws Exception {
         Generator gensecret = new Generator();
-        boolean updateAmq = gensecret.load(ou,cluster,cluster.getNamespace(),name);
+        boolean updateAmq = gensecret.load(ou,cluster,cluster.getNamespace(),name,this.admmissionHooks,this.mutationHooks);
         new Updater(cluster,cluster.getNamespace(),name,updateAmq).rollout();
 
     }
