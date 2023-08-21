@@ -3,6 +3,7 @@ package com.tremolosecurity.openunison;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
+import java.util.ArrayList;
 import java.util.UUID;
 
 import org.json.simple.JSONArray;
@@ -71,7 +72,7 @@ public class TestOperatorControl {
         ((JSONObject)resp.getBody().get("metadata")).remove("uid");
 
 
-        Operator operator = new Operator(cluster,5);
+        Operator operator = new Operator(cluster,5,new ArrayList<String>(),new ArrayList<String>());
         operator.init();
 
         new Thread() {
@@ -180,7 +181,7 @@ public class TestOperatorControl {
         assertEquals(200,resp.getResult());
 
 
-        Operator operator = new Operator(cluster,5);
+        Operator operator = new Operator(cluster,5,new ArrayList<String>(),new ArrayList<String>());
         operator.init();
 
 
@@ -257,7 +258,7 @@ public class TestOperatorControl {
 
         // do stuff
         
-        Operator operator = new Operator(cluster,5);
+        Operator operator = new Operator(cluster,5,new ArrayList<String>(),new ArrayList<String>());
         operator.init();
 
         // make sure nothing has changed on init run

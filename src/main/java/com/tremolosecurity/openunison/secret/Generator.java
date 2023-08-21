@@ -63,6 +63,8 @@ import io.k8s.JSON.DateTypeAdapter;
 import io.k8s.JSON.LocalDateTypeAdapter;
 import io.k8s.JSON.OffsetDateTimeTypeAdapter;
 import io.k8s.JSON.SqlDateTypeAdapter;
+import io.k8s.obj.IoK8sApiAdmissionregistrationV1MutatingWebhook;
+import io.k8s.obj.IoK8sApiAdmissionregistrationV1MutatingWebhookConfiguration;
 import io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhook;
 import io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhookConfiguration;
 import io.k8s.obj.IoK8sApimachineryPkgApisMetaV1ObjectMeta;
@@ -75,6 +77,9 @@ public class Generator {
     ClusterConnection cluster;
     Map<String,String> props;
 
+    List<String> mutationHooks;
+    List<String> admmissionHooks;
+
     KeyStore ouKs;
 
     public Map<String, String> getProps() {
@@ -85,7 +90,7 @@ public class Generator {
         this.props = new HashMap<String,String>();
     }
 
-    public boolean load(OpenUnison ou,ClusterConnection cluster,String namespace,String name) throws Exception {
+    public boolean load(OpenUnison ou,ClusterConnection cluster,String namespace,String name,List<String> admmissionHooks,List<String> mutationHooks) throws Exception {
         this.ou = ou;
         this.namespace = namespace;
         this.name = name;
@@ -96,6 +101,18 @@ public class Generator {
         this.generateStaticKeys();
         this.generateOpenUnisonSecret();
         this.updateValidatingWebhookCertificate();
+
+
+        this.mutationHooks = mutationHooks;
+        this.admmissionHooks = admmissionHooks;
+
+        for (String admissionHook : this.admmissionHooks) {
+            this.updateValidatingWebhookCertificate(admissionHook);
+        }
+
+        for (String mutatingHook : this.mutationHooks) {
+            this.updateMutatingWebhookCertificate(mutatingHook);
+        }
 
         if (this.props.get("OPENUNISON_PROVISIONING_ENABLED") != null && this.props.get("OPENUNISON_PROVISIONING_ENABLED").equalsIgnoreCase("true")) {
             RunSQL runSQL = new RunSQL();
@@ -574,10 +591,12 @@ public class Generator {
     }
 
 
-    
-
     private void updateValidatingWebhookCertificate() throws Exception {
-        String whUriNs = "/apis/admissionregistration.k8s.io/v1/validatingwebhookconfigurations/openunison-workflow-validation-" + this.name;
+        this.updateValidatingWebhookCertificate("openunison-workflow-validation-" + this.name);
+    }
+
+    private void updateValidatingWebhookCertificate(String whname) throws Exception {
+        String whUriNs = "/apis/admissionregistration.k8s.io/v1/validatingwebhookconfigurations/"+ whname;
         
         System.out.println("Starting webhook check, looking up " + whUriNs);
         WsResponse resp = cluster.get(whUriNs);
@@ -614,6 +633,60 @@ public class Generator {
             }
 
             io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhookConfiguration forPatch = new io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhookConfiguration();
+            forPatch.setWebhooks(webHookObj.getWebhooks());
+            String jsonForPatch = forPatch.toJson();
+            resp = cluster.patch(whUriNs, jsonForPatch);
+            if (resp.getResult() < 200 || resp.getResult() > 299) {
+                throw new Exception("Could not patch webhook : " + resp.getResult() + " / " + resp.getBody().toString());
+                
+            } else {
+                System.out.println("Webhook successfully patched");
+            }
+        } else {
+            System.out.println("Webhook does not need to be udpated");
+        }
+        
+
+    }
+
+    private void updateMutatingWebhookCertificate(String whname) throws Exception {
+        String whUriNs = "/apis/admissionregistration.k8s.io/v1/mutatingwebhookconfigurations/"+ whname;
+        
+        System.out.println("Starting mutating webhook check, looking up " + whUriNs);
+        WsResponse resp = cluster.get(whUriNs);
+
+        if (resp.getResult() != 200) {
+            System.out.println("Unable to load: " + resp.getResult() + " / " + resp.getBody().toJSONString());
+            return;
+        } 
+
+        java.security.cert.Certificate unisonCert = this.ouKs.getCertificate("unison-tls");
+
+        if (unisonCert == null) {
+            System.out.println("unison-tls certificate does not exist, not attempting any updates");
+            return;
+        }
+
+        
+
+        String unisonTlsPem = CertUtils.exportCert((X509Certificate) unisonCert);
+        byte[] unisonCertBytes = unisonTlsPem.getBytes("UTF-8");
+        
+
+        String fromSecretCertBase64 = java.util.Base64.getEncoder().encodeToString(unisonCertBytes);
+        
+        io.k8s.obj.IoK8sApiAdmissionregistrationV1MutatingWebhookConfiguration webHookObj = io.k8s.JSON.getGson().fromJson(resp.getBody().toString(),IoK8sApiAdmissionregistrationV1MutatingWebhookConfiguration.class);
+
+        
+        String fromWh =  new String(java.util.Base64.getEncoder().encode(webHookObj.getWebhooks().get(0).getClientConfig().getCaBundle()));
+
+        if (! fromSecretCertBase64.equals(fromWh)) {
+            System.out.println("Webhook needs to be udpated");
+            for (IoK8sApiAdmissionregistrationV1MutatingWebhook wh : webHookObj.getWebhooks()) {
+                wh.getClientConfig().setCaBundle(unisonCertBytes);
+            }
+
+            io.k8s.obj.IoK8sApiAdmissionregistrationV1MutatingWebhookConfiguration forPatch = new io.k8s.obj.IoK8sApiAdmissionregistrationV1MutatingWebhookConfiguration();
             forPatch.setWebhooks(webHookObj.getWebhooks());
             String jsonForPatch = forPatch.toJson();
             resp = cluster.patch(whUriNs, jsonForPatch);

@@ -11,6 +11,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.text.ParseException;
+import java.util.ArrayList;
 
 import javax.net.ssl.SSLContext;
 
@@ -100,7 +101,7 @@ public class TestCheckCerts {
         assertEquals(404,cluster.getSecret("kubernetes-dashboard", "kubernetes-dashboard-certs").getResult() );
 
         
-        gen.load(ou, cluster, "openunison", "orchestra");
+        gen.load(ou, cluster, "openunison", "orchestra",new ArrayList<String>(),new ArrayList<String>());
 
         assertNotEquals(unisonTlsUid,getSecretUUID("unison-tls"));
         assertNotEquals(unisonSaml2RpSigUid,getSecretUUID("unison-saml2-rp-sig"));
@@ -192,7 +193,7 @@ public class TestCheckCerts {
         assertEquals(200,cluster.getSecret("kubernetes-dashboard", "kubernetes-dashboard-certs").getResult() );
 
         
-        gen.load(ou, cluster, "openunison", "orchestra");
+        gen.load(ou, cluster, "openunison", "orchestra",new ArrayList<String>(),new ArrayList<String>());
 
         assertEquals(unisonTlsUid,getSecretUUID("unison-tls"));
         assertEquals(unisonSaml2RpSigUid,getSecretUUID("unison-saml2-rp-sig"));
