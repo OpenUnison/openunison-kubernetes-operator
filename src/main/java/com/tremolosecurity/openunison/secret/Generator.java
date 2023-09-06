@@ -392,7 +392,7 @@ public class Generator {
             }
             
         } else {
-            throw new Exception("Unexpected error code trying to retrive the source secret " + this.ou.getSpec().getSourceSecret() + suffx + " from ns " + this.namespace + " / " + resp.getResult() + " / " + resp.getBody());
+            throw new Exception("Unexpected error code trying to retrive the source secret " + this.ou.getSpec().getSourceSecret() + suffix + " from ns " + this.namespace + " / " + resp.getResult() + " / " + resp.getBody());
         }
     }
 
