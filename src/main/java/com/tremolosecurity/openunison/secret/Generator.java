@@ -251,7 +251,12 @@ public class Generator {
                 keyObj.put("still_used",true);
 
                 dataPatch.put(staticKey.getName(), keyObj.toString().getBytes("UTF-8"));
-            } else if (staticKey.getVersion().intValue() != ((Long)staticKeyFromAPI.get("version")).intValue()) {
+            
+            } else if (staticKey.getVersion() == null && staticKeyFromAPI.get("version") == null) {
+                System.out.println("Keeping unchanged");
+                CertUtils.storeKey(ouKs, staticKey.getName(), ksPassword, (String) staticKeyFromAPI.get("key_data"));
+                dataPatch.put(staticKey.getName(), staticKeyFromAPI.toString().getBytes("UTF-8"));
+            } else if (  (staticKey.getVersion().intValue() != ((Long)staticKeyFromAPI.get("version")).intValue())) {
                 System.out.println("the static key version changed from " +  ((Long)staticKeyFromAPI.get("version")).intValue() + " to " + staticKey.getVersion().intValue()  + ",recreating");
                 CertUtils.createKey(ouKs, staticKey.getName(), ksPassword );
                 JSONObject keyObj = new JSONObject();
