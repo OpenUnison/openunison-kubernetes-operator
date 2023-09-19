@@ -251,7 +251,8 @@ public class Generator {
                 keyObj.put("still_used",true);
 
                 dataPatch.put(staticKey.getName(), keyObj.toString().getBytes("UTF-8"));
-            } else if (staticKey.getVersion().intValue() != ((Long)staticKeyFromAPI.get("version")).intValue()) {
+            
+            } else if (  (staticKey.getVersion().intValue() != ((Long)staticKeyFromAPI.get("version")).intValue())) {
                 System.out.println("the static key version changed from " +  ((Long)staticKeyFromAPI.get("version")).intValue() + " to " + staticKey.getVersion().intValue()  + ",recreating");
                 CertUtils.createKey(ouKs, staticKey.getName(), ksPassword );
                 JSONObject keyObj = new JSONObject();
@@ -367,7 +368,17 @@ public class Generator {
     }
 
     private void loadPropertiesFromSecret() throws Exception {
-        WsResponse resp = this.cluster.getSecret(this.namespace, this.ou.getSpec().getSourceSecret());
+
+
+        String suffix = "";
+
+        for  (OpenUnisonSpecHostsInnerAnnotationsInner nsData : this.ou.getSpec().getNonSecretData()) {
+            if (nsData.getName().equalsIgnoreCase("openunison.static-secret.suffix")) {
+                suffix = nsData.getValue();
+            }
+        }
+
+        WsResponse resp = this.cluster.getSecret(this.namespace, this.ou.getSpec().getSourceSecret() + suffix);
         
         if (resp.getResult() >= 200 && resp.getResult() < 300) {
             JSONObject data = (JSONObject) resp.getBody().get("data");
@@ -382,7 +393,7 @@ public class Generator {
             }
             
         } else {
-            throw new Exception("Unexpected error code trying to retrive the source secret " + this.ou.getSpec().getSourceSecret() + " from ns " + this.namespace + " / " + resp.getResult() + " / " + resp.getBody());
+            throw new Exception("Unexpected error code trying to retrive the source secret " + this.ou.getSpec().getSourceSecret() + suffix + " from ns " + this.namespace + " / " + resp.getResult() + " / " + resp.getBody());
         }
     }
 
