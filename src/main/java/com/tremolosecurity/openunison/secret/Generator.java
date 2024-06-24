@@ -715,6 +715,8 @@ public class Generator {
     }
 
     private boolean setupAmqSecrets() throws Exception {
+        String secretSuffix = this.props.get("openunison.static-secret.suffix");
+
         boolean updated = false;
         if (! this.ou.getSpec().getEnableActivemq()) {
             System.out.println("ActiveMQ not enabled, skipping");
@@ -729,16 +731,41 @@ public class Generator {
         amqKS.load(null, ksPassword.toCharArray());
 
         System.out.println("Trusting the amq-client certificate");
-        amqKS.setCertificateEntry("trusted-amq-client", this.ouKs.getCertificate("amq-client"));
 
-        WsResponse res = this.cluster.get("/api/v1/namespaces/" + this.namespace + "/secrets/" + this.name + "-amq-server");
+
+
+        
+
+        WsResponse res = this.cluster.get("/api/v1/namespaces/" + this.namespace + "/secrets/" + this.name + "-amq-server" + secretSuffix);
 
         if (res.getResult() != 200) {
-            throw new Exception("Could not load secret " + this.name + "-amq-server / " + res.getResult() + " / " + res.getBody().toJSONString());
+            throw new Exception("Could not load secret " + this.name + "-amq-server" + secretSuffix + " / " + res.getResult() + " / " + res.getBody().toJSONString());
         }
 
         IoK8sApiCoreV1Secret amqServerSecret = io.k8s.JSON.getGson().fromJson(res.getBody().toJSONString(), IoK8sApiCoreV1Secret.class);
         CertUtils.importKeyPairAndCert(amqKS, ksPassword, "broker", Base64.getEncoder().encodeToString(amqServerSecret.getData().get("tls.key")), Base64.getEncoder().encodeToString(amqServerSecret.getData().get("tls.crt")));
+
+
+        java.security.cert.Certificate amqClientCert = this.ouKs.getCertificate("amq-client");
+        java.security.cert.Certificate amqServerCert = amqKS.getCertificate("broker");
+
+        if (! amqClientCert.equals(amqServerCert)) {
+            //including the key in addition to the cert in order to support auth to remote AMQs
+            System.out.println("AMQ Client and Server certificates are different, importing client cert");
+            
+            res = this.cluster.get("/api/v1/namespaces/" + this.namespace + "/secrets/" + this.name + "-amq-client" + secretSuffix);
+
+            if (res.getResult() != 200) {
+                throw new Exception("Could not load secret " + this.name + "-amq-client" + secretSuffix + " / " + res.getResult() + " / " + res.getBody().toJSONString());
+            }
+
+            IoK8sApiCoreV1Secret amqClientSecret = io.k8s.JSON.getGson().fromJson(res.getBody().toJSONString(), IoK8sApiCoreV1Secret.class);
+            CertUtils.importKeyPairAndCert(amqKS, ksPassword, "trusted-amq-client", Base64.getEncoder().encodeToString(amqClientSecret.getData().get("tls.key")), Base64.getEncoder().encodeToString(amqClientSecret.getData().get("tls.crt")));
+        } else {
+            System.out.println("AMQ Client and Server certificates are the same, NOT importing client cert");
+        }
+        
+
 
         String amqSecretUri = "/api/v1/namespaces/" + this.namespace + "/secrets/amq-secrets-" + this.name;
         res = cluster.get(amqSecretUri);
