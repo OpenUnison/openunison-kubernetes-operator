@@ -756,14 +756,15 @@ public class Generator {
             //including the key in addition to the cert in order to support auth to remote AMQs
             System.out.println("AMQ Client and Server certificates are different, importing client cert");
             
-            res = this.cluster.get("/api/v1/namespaces/" + this.namespace + "/secrets/" + this.name + "-amq-client" + secretSuffix);
+            // res = this.cluster.get("/api/v1/namespaces/" + this.namespace + "/secrets/" + this.name + "-amq-client" + secretSuffix);
 
-            if (res.getResult() != 200) {
-                throw new Exception("Could not load secret " + this.name + "-amq-client" + secretSuffix + " / " + res.getResult() + " / " + res.getBody().toJSONString());
-            }
+            // if (res.getResult() != 200) {
+            //     throw new Exception("Could not load secret " + this.name + "-amq-client" + secretSuffix + " / " + res.getResult() + " / " + res.getBody().toJSONString());
+            // }
 
-            IoK8sApiCoreV1Secret amqClientSecret = io.k8s.JSON.getGson().fromJson(res.getBody().toJSONString(), IoK8sApiCoreV1Secret.class);
-            CertUtils.importKeyPairAndCert(amqKS, ksPassword, "trusted-amq-client", Base64.getEncoder().encodeToString(amqClientSecret.getData().get("tls.key")), Base64.getEncoder().encodeToString(amqClientSecret.getData().get("tls.crt")));
+            // IoK8sApiCoreV1Secret amqClientSecret = io.k8s.JSON.getGson().fromJson(res.getBody().toJSONString(), IoK8sApiCoreV1Secret.class);
+            // CertUtils.importKeyPairAndCert(amqKS, ksPassword, "trusted-amq-client", Base64.getEncoder().encodeToString(amqClientSecret.getData().get("tls.key")), Base64.getEncoder().encodeToString(amqClientSecret.getData().get("tls.crt")));
+            amqKS.setCertificateEntry("trusted-amq-client", this.ouKs.getCertificate("amq-client"));
         } else {
             System.out.println("AMQ Client and Server certificates are the same, NOT importing client cert");
         }
