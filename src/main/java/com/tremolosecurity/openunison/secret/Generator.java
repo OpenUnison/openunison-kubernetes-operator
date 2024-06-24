@@ -716,6 +716,9 @@ public class Generator {
 
     private boolean setupAmqSecrets() throws Exception {
         String secretSuffix = this.props.get("openunison.static-secret.suffix");
+        if (secretSuffix == null) {
+            secretSuffix = "";
+        }
 
         boolean updated = false;
         if (! this.ou.getSpec().getEnableActivemq()) {
