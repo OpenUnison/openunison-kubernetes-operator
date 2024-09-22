@@ -63,7 +63,7 @@ jobs:
       
       
       -
-        name: Build and push
+        name: Build and push x86
         id: docker_build
         uses: docker/build-push-action@v2
         with:
@@ -75,6 +75,20 @@ jobs:
             docker.io/${{ secrets.OU_CONTAINER_REPO }}/openunison-kubernetes-operator:${{ env.SHORT_TAG }}
             docker.io/${{ secrets.OU_CONTAINER_REPO }}/openunison-kubernetes-operator:latest
 
+            ghcr.io/${{ env.REPO }}:${{ env.TAG }}
+            ghcr.io/${{ env.REPO }}:${{ env.SHORT_TAG }}
+            ghcr.io/${{ env.REPO }}:latest
+
+      -
+        name: Build and push
+        id: docker_build_arm64
+        uses: docker/build-push-action@v2
+        with:
+          push: true
+          file: src/main/docker/Dockerfile
+          platforms: linux/arm64
+          context: /home/runner/work/openunison-kubernetes-operator/openunison-kubernetes-operator
+          tags: |
             ghcr.io/${{ env.REPO }}:${{ env.TAG }}
             ghcr.io/${{ env.REPO }}:${{ env.SHORT_TAG }}
             ghcr.io/${{ env.REPO }}:latest
