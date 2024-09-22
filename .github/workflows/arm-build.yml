@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   docker:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - name: Set up JDK 17
@@ -63,6 +63,7 @@ jobs:
         with:
           push: true
           file: src/main/docker/Dockerfile
+          platforms: linux/arm64
           context: /home/runner/work/openunison-kubernetes-operator/openunison-kubernetes-operator
           tags: |
             ghcr.io/${{ env.REPO }}:${{ env.TAG }}
@@ -70,22 +71,22 @@ jobs:
             ghcr.io/${{ env.REPO }}:latest
 
 
-      - name: sign images
-        run: |-
-          cosign sign -y ghcr.io/${{ env.REPO }}:${{ env.TAG }}
+      # - name: sign images
+      #   run: |-
+      #     cosign sign -y ghcr.io/${{ env.REPO }}:${{ env.TAG }}
 
       
-      - uses: anchore/sbom-action@v0
-        with:
-          image: ghcr.io/${{ env.REPO }}:${{ env.TAG }}
-          format: spdx
-          output-file: /tmp/spdxg
+      # - uses: anchore/sbom-action@v0
+      #   with:
+      #     image: ghcr.io/${{ env.REPO }}:${{ env.TAG }}
+      #     format: spdx
+      #     output-file: /tmp/spdxg
 
-      - name: attach sbom to images
-        run: |-
-          cosign attach sbom --sbom /tmp/spdxg ghcr.io/${{ env.REPO }}:${{ env.TAG }}
-          GH_SBOM_SHA=$(cosign verify --certificate-oidc-issuer-regexp='.*' --certificate-identity-regexp='.*' ghcr.io/${{ env.REPO }}:${{ env.TAG }} 2>/dev/null | jq -r '.[0].critical.image["docker-manifest-digest"]' | cut -c 8-)
-          cosign sign -y ghcr.io/${{ env.REPO }}:sha256-$GH_SBOM_SHA.sbom
+      # - name: attach sbom to images
+      #   run: |-
+      #     cosign attach sbom --sbom /tmp/spdxg ghcr.io/${{ env.REPO }}:${{ env.TAG }}
+      #     GH_SBOM_SHA=$(cosign verify --certificate-oidc-issuer-regexp='.*' --certificate-identity-regexp='.*' ghcr.io/${{ env.REPO }}:${{ env.TAG }} 2>/dev/null | jq -r '.[0].critical.image["docker-manifest-digest"]' | cut -c 8-)
+      #     cosign sign -y ghcr.io/${{ env.REPO }}:sha256-$GH_SBOM_SHA.sbom
 
 
       
