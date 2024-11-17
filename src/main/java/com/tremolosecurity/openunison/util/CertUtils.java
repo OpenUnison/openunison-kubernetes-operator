@@ -557,6 +557,11 @@ public class CertUtils {
             CertificateException, FileNotFoundException, IOException {
         KeyStore cacerts = KeyStore.getInstance(KeyStore.getDefaultType());
         String cacertsPath = System.getenv("CA_CERTS_PATH");
+
+        String arch = System.getProperty("os.arch");
+        if (! arch.equals("amd64")) {
+            cacertsPath = cacertsPath.replaceAll("amd64",arch);
+        }
         
         
         cacerts.load(new FileInputStream(cacertsPath), null);
