@@ -20,6 +20,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
@@ -43,6 +44,7 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.RSAPrivateCrtKeySpec;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
@@ -65,9 +67,10 @@ import javax.swing.JComboBox;
 import com.tremolosecurity.openunison.obj.CertificateData;
 import com.tremolosecurity.openunison.obj.X509Data;
 
-
+import org.bouncycastle.asn1.ASN1Primitive;
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
+import org.bouncycastle.asn1.pkcs.RSAPrivateKey;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.ExtendedKeyUsage;
@@ -91,6 +94,8 @@ import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequestBuilder;
+import org.bouncycastle.util.io.pem.PemObject;
+import org.bouncycastle.util.io.pem.PemReader;
 import org.bouncycastle.util.io.pem.PemWriter;
 import org.bouncycastle.x509.X509V3CertificateGenerator;
 import org.joda.time.DateTime;
@@ -420,18 +425,54 @@ public class CertUtils {
         return baos.toByteArray();
     }
 
+    public static PrivateKey parsePKCS1PrivateKey(String pemPrivateKey) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException  {
+        // Remove PEM headers and decode Base64
+        PemReader pemReader = new PemReader(new StringReader(pemPrivateKey));
+        PemObject pemObject = pemReader.readPemObject();
+        byte[] keyBytes = pemObject.getContent();
+        pemReader.close();
+
+        // Parse ASN.1 structure
+        ASN1Primitive asn1Primitive = ASN1Primitive.fromByteArray(keyBytes);
+        RSAPrivateKey rsaPrivateKey = RSAPrivateKey.getInstance(asn1Primitive);
+
+        // Create RSAPrivateCrtKeySpec
+        RSAPrivateCrtKeySpec keySpec = new RSAPrivateCrtKeySpec(
+                rsaPrivateKey.getModulus(),
+                rsaPrivateKey.getPublicExponent(),
+                rsaPrivateKey.getPrivateExponent(),
+                rsaPrivateKey.getPrime1(),
+                rsaPrivateKey.getPrime2(),
+                rsaPrivateKey.getExponent1(),
+                rsaPrivateKey.getExponent2(),
+                rsaPrivateKey.getCoefficient()
+        );
+
+        // Generate PrivateKey
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        return keyFactory.generatePrivate(keySpec);
+    }
+
     public static void importKeyPairAndCert(KeyStore ks, String ksPass, String alias, String privateKeyEncoded,
             String certEncoded) throws IOException, CertificateException, KeyStoreException, NoSuchAlgorithmException,
             InvalidKeySpecException {
 
         String privateKeyPEM = new String(java.util.Base64.getDecoder().decode(privateKeyEncoded));
+        PrivateKey unencryptedPrivateKey = null;
 
-        privateKeyPEM = privateKeyPEM.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----",
+        if (privateKeyPEM.indexOf("BEGIN RSA PRIVATE KEY") > 0) {
+            unencryptedPrivateKey = parsePKCS1PrivateKey(privateKeyPEM);
+        } else {
+            privateKeyPEM = privateKeyPEM.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----",
                 "");// .trim();//.replaceAll("[\n,\r]", "").trim();
-        byte[] pkBytes = org.bouncycastle.util.encoders.Base64.decode(privateKeyPEM);
-        PKCS8EncodedKeySpec kspec = new PKCS8EncodedKeySpec(pkBytes);
-        KeyFactory kf = KeyFactory.getInstance("RSA");
-        PrivateKey unencryptedPrivateKey = kf.generatePrivate(kspec);
+                byte[] pkBytes = org.bouncycastle.util.encoders.Base64.decode(privateKeyPEM);
+                PKCS8EncodedKeySpec kspec = new PKCS8EncodedKeySpec(pkBytes);
+                KeyFactory kf = KeyFactory.getInstance("RSA");
+                unencryptedPrivateKey = kf.generatePrivate(kspec);
+        }
+
+        
+         
 
         // System.out.println(privateKeyPEM);
 
