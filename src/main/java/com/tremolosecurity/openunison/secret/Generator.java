@@ -80,7 +80,10 @@ public class Generator {
     List<String> mutationHooks;
     List<String> admmissionHooks;
 
+    
+
     KeyStore ouKs;
+    private SecretWatcher secretWatcher;
 
     public Map<String, String> getProps() {
         return props;
@@ -90,7 +93,7 @@ public class Generator {
         this.props = new HashMap<String,String>();
     }
 
-    public boolean load(OpenUnison ou,ClusterConnection cluster,String namespace,String name,List<String> admmissionHooks,List<String> mutationHooks) throws Exception {
+    public boolean load(OpenUnison ou,ClusterConnection cluster,String namespace,String name,List<String> admmissionHooks,List<String> mutationHooks,SecretWatcher secretWatcher) throws Exception {
         this.ou = ou;
         this.namespace = namespace;
         this.name = name;
@@ -106,6 +109,8 @@ public class Generator {
         this.mutationHooks = mutationHooks;
         this.admmissionHooks = admmissionHooks;
 
+        
+
         for (String admissionHook : this.admmissionHooks) {
             this.updateValidatingWebhookCertificate(admissionHook);
         }
@@ -113,6 +118,8 @@ public class Generator {
         for (String mutatingHook : this.mutationHooks) {
             this.updateMutatingWebhookCertificate(mutatingHook);
         }
+
+        this.secretWatcher = secretWatcher;
 
         if (this.props.get("OPENUNISON_PROVISIONING_ENABLED") != null && this.props.get("OPENUNISON_PROVISIONING_ENABLED").equalsIgnoreCase("true")) {
             RunSQL runSQL = new RunSQL();
@@ -438,12 +445,15 @@ public class Generator {
 
         System.out.println("Secret namespace : " + targetNs);
 
+        
+
         String secretName = keySpec.getName();
         if (keySpec.getTlsSecretName() != null && !keySpec.getTlsSecretName().isBlank()) {
             secretName = keySpec.getTlsSecretName();
         } 
 
         System.out.println("Secret name : " + secretName);
+        this.secretWatcher.addSecret(targetNs,secretName,keySpec.getName());
 
         // check if the secret already exist
         WsResponse resp = this.cluster.getSecret(targetNs, secretName);

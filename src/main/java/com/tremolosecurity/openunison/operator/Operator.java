@@ -15,8 +15,10 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 
 import javax.net.ssl.SSLContext;
 
@@ -32,6 +34,7 @@ import com.tremolosecurity.openunison.deployment.Updater;
 import com.tremolosecurity.openunison.kubernetes.ClusterConnection;
 import com.tremolosecurity.openunison.obj.WsResponse;
 import com.tremolosecurity.openunison.secret.Generator;
+import com.tremolosecurity.openunison.secret.SecretWatcher;
 
 public class Operator {
     ClusterConnection cluster;
@@ -45,12 +48,15 @@ public class Operator {
     List<String> mutationHooks;
     List<String> admmissionHooks;
 
-    public Operator(ClusterConnection cluster,int timeoutSeconds, List<String> admmissionHooks, List<String> mutationHooks) {
+    SecretWatcher secretsToWatch;
+
+    public Operator(ClusterConnection cluster,int timeoutSeconds, List<String> admmissionHooks, List<String> mutationHooks) throws Exception {
         this.cluster = cluster;
         this.processedResources = new HashSet<String>();
         this.timeoutSeconds = timeoutSeconds;
         this.admmissionHooks = admmissionHooks;
         this.mutationHooks = mutationHooks;
+        this.secretsToWatch = new SecretWatcher(cluster );
     }
 
     public void init() throws Exception {
@@ -63,7 +69,7 @@ public class Operator {
         HttpRequest get = HttpRequest.newBuilder()
                             .uri(new URI(cluster.getWatchUrl()))
                             .GET()
-                            .header("Authorization", String.format("Bearer %s", cluster.loadToken()))
+                            .header("Authorization", String.format("Bearer %s", cluster.loadToken().trim()))
                             .build();
 
         HttpResponse<String> resp = http.send(get,BodyHandlers.ofString());
@@ -111,6 +117,23 @@ public class Operator {
                         } else {
                             System.out.println("Resource " + resourceVersion + " has not changed, not processing");
                             
+                            // need to still load secrets to track
+                            ou.getSpec().getKeyStore().getKeyPairs().getKeys().forEach(keySpec -> {
+                                String targetNs = cluster.getNamespace();
+                                if (keySpec.getCreateData().getTargetNamespace() != null && ! keySpec.getCreateData().getTargetNamespace().isBlank()) {
+                                    targetNs = keySpec.getCreateData().getTargetNamespace();
+                                }
+
+                                System.out.println("Secret namespace : " + targetNs);
+
+                                String secretName = keySpec.getName();
+                                if (keySpec.getTlsSecretName() != null && !keySpec.getTlsSecretName().isBlank()) {
+                                    secretName = keySpec.getTlsSecretName();
+                                } 
+
+                                System.out.println("Secret name : " + secretName);
+                                secretsToWatch.addSecret(targetNs,secretName,keySpec.getName());
+                            });
 
                         }
                     }
@@ -236,6 +259,8 @@ public class Operator {
             }
         }
 
+        this.secretsToWatch.shutdown();
+
         System.out.println("Watch ended");
     }
 
@@ -273,7 +298,7 @@ public class Operator {
 
     private void processObject(com.tremolosecurity.openunison.crd.OpenUnison ou,String name) throws Exception {
         Generator gensecret = new Generator();
-        boolean updateAmq = gensecret.load(ou,cluster,cluster.getNamespace(),name,this.admmissionHooks,this.mutationHooks);
+        boolean updateAmq = gensecret.load(ou,cluster,cluster.getNamespace(),name,this.admmissionHooks,this.mutationHooks,this.secretsToWatch);
         new Updater(cluster,cluster.getNamespace(),name,updateAmq).rollout();
 
     }
