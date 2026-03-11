@@ -62,7 +62,7 @@ public class ClusterConnection {
         HttpRequest get = HttpRequest.newBuilder()
                                         .uri(new URI(this.url + secretUrl))
                                         .GET()
-                                        .header("Authorization", String.format("Bearer %s", this.loadToken()))
+                                        .header("Authorization", String.format("Bearer %s", this.loadToken().trim()))
                                         .build();
 
         HttpResponse<String> resp = http.send(get,BodyHandlers.ofString());
@@ -83,10 +83,12 @@ public class ClusterConnection {
             this.uriPath = String.format("/apis/openunison.tremolo.io/v%s/namespaces/%s/openunisons",versions[i],this.namespace);
             System.out.println("URL: " + urlToTest); 
 
+            String headerVal =  String.format("Bearer %s", this.loadToken()).trim();
+
             HttpRequest get = HttpRequest.newBuilder()
                                         .uri(new URI(urlToTest))
                                         .GET()
-                                        .header("Authorization", String.format("Bearer %s", this.loadToken()))
+                                        .header("Authorization",headerVal)
                                         .build();
 
             HttpResponse<String> resp = http.send(get,BodyHandlers.ofString());
@@ -110,7 +112,7 @@ public class ClusterConnection {
 
     public String loadToken() {
         try {
-            return Files.readString(Path.of(this.pathToToken));
+            return Files.readString(Path.of(this.pathToToken)).trim();
         } catch (IOException e) {
             e.printStackTrace();
             System.exit(1);
@@ -180,7 +182,7 @@ public class ClusterConnection {
         HttpRequest get = HttpRequest.newBuilder()
         .uri(new URI(this.url + uri))
         .DELETE()
-        .header("Authorization", String.format("Bearer %s", this.loadToken()))
+        .header("Authorization", String.format("Bearer %s", this.loadToken().trim()))
         .build();
 
         HttpResponse<String> resp = http.send(get,BodyHandlers.ofString());
@@ -196,7 +198,7 @@ public class ClusterConnection {
         HttpRequest get = HttpRequest.newBuilder()
         .uri(new URI(this.url + uri))
         .POST(BodyPublishers.ofString(json))
-        .header("Authorization", String.format("Bearer %s", this.loadToken()))
+        .header("Authorization", String.format("Bearer %s", this.loadToken().trim()))
         .header("Content-type", "application/json")
         .build();
 
@@ -213,7 +215,7 @@ public class ClusterConnection {
         HttpRequest get = HttpRequest.newBuilder()
         .uri(new URI(this.url + uri))
         .method("PATCH",BodyPublishers.ofString(json))
-        .header("Authorization", String.format("Bearer %s", this.loadToken()))
+        .header("Authorization", String.format("Bearer %s", this.loadToken().trim()))
         .header("Content-type", "application/merge-patch+json")
         .build();
 
@@ -228,6 +230,10 @@ public class ClusterConnection {
 
     public String getUriPath() {
         return uriPath;
+    }
+
+    public HttpClient getHttp() {
+        return this.http;
     }
     
 }

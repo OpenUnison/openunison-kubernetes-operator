@@ -101,7 +101,7 @@ public class TestCheckCerts {
         assertEquals(404,cluster.getSecret("kubernetes-dashboard", "kubernetes-dashboard-certs").getResult() );
 
         
-        gen.load(ou, cluster, "openunison", "orchestra",new ArrayList<String>(),new ArrayList<String>());
+        gen.load(ou, cluster, "openunison", "orchestra",new ArrayList<String>(),new ArrayList<String>(),null);
 
         assertNotEquals(unisonTlsUid,getSecretUUID("unison-tls"));
         assertNotEquals(unisonSaml2RpSigUid,getSecretUUID("unison-saml2-rp-sig"));
@@ -193,7 +193,7 @@ public class TestCheckCerts {
         assertEquals(200,cluster.getSecret("kubernetes-dashboard", "kubernetes-dashboard-certs").getResult() );
 
         
-        gen.load(ou, cluster, "openunison", "orchestra",new ArrayList<String>(),new ArrayList<String>());
+        gen.load(ou, cluster, "openunison", "orchestra",new ArrayList<String>(),new ArrayList<String>(),null);
 
         assertEquals(unisonTlsUid,getSecretUUID("unison-tls"));
         assertEquals(unisonSaml2RpSigUid,getSecretUUID("unison-saml2-rp-sig"));
