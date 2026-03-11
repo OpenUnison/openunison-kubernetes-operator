@@ -1,8 +1,8 @@
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 MAINTAINER Tremolo Security, Inc. - Docker <docker@tremolosecurity.com>
 
-RUN apt-get update;apt-get -y install openjdk-17-jre-headless curl apt-transport-https gnupg && \
+RUN apt-get update;apt-get -y install openjdk-21-jre-headless curl apt-transport-https gnupg && \
     curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - && \
     groupadd -r ouoperator -g 433 && \
     mkdir /usr/local/ouoperator && \
