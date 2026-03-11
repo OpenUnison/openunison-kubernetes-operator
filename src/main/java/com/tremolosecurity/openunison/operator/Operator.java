@@ -155,7 +155,7 @@ public class Operator {
                             .sslContext(sslCtx)
                             .build();
 
-
+            System.out.println("Starting watch with a timeout of " + this.timeoutSeconds + " seconds");
             StringBuilder urlBuilder = new StringBuilder().append(cluster.getWatchUrl()).append("?watch=true&timeoutSeconds=").append(this.timeoutSeconds).append("&allowWatchBookmarks=true");
             if (this.lastProcessedVersion != null) {
                 urlBuilder.append("&resourceVersion=").append(this.lastProcessedVersion);
@@ -259,7 +259,9 @@ public class Operator {
             }
         }
 
-        this.secretsToWatch.shutdown();
+        if (this.secretsToWatch != null) {
+            this.secretsToWatch.shutdown();
+        }
 
         System.out.println("Watch ended");
     }

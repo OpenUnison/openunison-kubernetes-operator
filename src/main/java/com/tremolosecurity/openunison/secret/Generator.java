@@ -120,6 +120,7 @@ public class Generator {
         }
 
         this.secretWatcher = secretWatcher;
+        
 
         if (this.props.get("OPENUNISON_PROVISIONING_ENABLED") != null && this.props.get("OPENUNISON_PROVISIONING_ENABLED").equalsIgnoreCase("true")) {
             RunSQL runSQL = new RunSQL();
@@ -453,7 +454,13 @@ public class Generator {
         } 
 
         System.out.println("Secret name : " + secretName);
-        this.secretWatcher.addSecret(targetNs,secretName,keySpec.getName());
+        if (this.secretWatcher != null) {
+            this.secretWatcher.addSecret(targetNs,secretName,keySpec.getName());
+        } else {
+            System.out.println("WARNING: no secret watcher");
+        }
+
+        
 
         // check if the secret already exist
         WsResponse resp = this.cluster.getSecret(targetNs, secretName);
