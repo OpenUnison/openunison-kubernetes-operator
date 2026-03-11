@@ -132,7 +132,11 @@ public class Operator {
                                 } 
 
                                 System.out.println("Secret name : " + secretName);
-                                secretsToWatch.addSecret(targetNs,secretName,keySpec.getName());
+                                if (this.secretsToWatch != null) {
+                                    secretsToWatch.addSecret(targetNs,secretName,keySpec.getName());
+                                } else {
+                                    System.out.println("WARNING: No secret watcher!");
+                                }
                             });
 
                         }

@@ -93,11 +93,16 @@ public class Generator {
         this.props = new HashMap<String,String>();
     }
 
-    public boolean load(OpenUnison ou,ClusterConnection cluster,String namespace,String name,List<String> admmissionHooks,List<String> mutationHooks,SecretWatcher secretWatcher) throws Exception {
+    public boolean load(OpenUnison ou,ClusterConnection cluster,String namespace,String name,List<String> admmissionHooks,List<String> mutationHooks,SecretWatcher secretWatcherParam) throws Exception {
         this.ou = ou;
         this.namespace = namespace;
         this.name = name;
         this.cluster = cluster;
+
+        
+        this.secretWatcher = secretWatcherParam;
+
+
         this.loadPropertiesFromCrd();
         this.loadPropertiesFromSecret();
         this.generateKeyStore();
@@ -119,7 +124,7 @@ public class Generator {
             this.updateMutatingWebhookCertificate(mutatingHook);
         }
 
-        this.secretWatcher = secretWatcher;
+        
         
 
         if (this.props.get("OPENUNISON_PROVISIONING_ENABLED") != null && this.props.get("OPENUNISON_PROVISIONING_ENABLED").equalsIgnoreCase("true")) {
