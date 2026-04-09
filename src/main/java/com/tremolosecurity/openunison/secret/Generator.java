@@ -203,6 +203,11 @@ public class Generator {
             sb.append(key).append('=').append(this.props.get(key)).append('\n');
         }
 
+        // remove the trailing \n
+        if (sb.length() > 0) {
+            sb.setLength(sb.length() - 1);
+        }
+
         return sb.toString().getBytes("UTF-8");
     }
 
