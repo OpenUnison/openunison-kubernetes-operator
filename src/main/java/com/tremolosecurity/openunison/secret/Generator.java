@@ -203,6 +203,11 @@ public class Generator {
             sb.append(key).append('=').append(this.props.get(key)).append('\n');
         }
 
+        // remove the trailing \n
+        if (sb.length() > 0) {
+            sb.setLength(sb.length() - 1);
+        }
+
         return sb.toString().getBytes("UTF-8");
     }
 
@@ -1001,22 +1006,11 @@ public class Generator {
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhookConfiguration.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhookConfigurationList.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1WebhookClientConfig.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1AuditAnnotation.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1ExpressionWarning.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1MatchCondition.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1MatchResources.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1NamedRuleWithOperations.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1ParamKind.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1ParamRef.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1TypeChecking.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1ValidatingAdmissionPolicy.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1ValidatingAdmissionPolicyBinding.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1ValidatingAdmissionPolicyBindingList.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1ValidatingAdmissionPolicyBindingSpec.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1ValidatingAdmissionPolicyList.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1ValidatingAdmissionPolicySpec.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1ValidatingAdmissionPolicyStatus.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAdmissionregistrationV1alpha1Validation.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiApiserverinternalV1alpha1ServerStorageVersion.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiApiserverinternalV1alpha1StorageVersion.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiApiserverinternalV1alpha1StorageVersionCondition.CustomTypeAdapterFactory());
@@ -1060,10 +1054,6 @@ public class Generator {
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthenticationV1TokenReviewSpec.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthenticationV1TokenReviewStatus.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthenticationV1UserInfo.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthenticationV1alpha1SelfSubjectReview.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthenticationV1alpha1SelfSubjectReviewStatus.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthenticationV1beta1SelfSubjectReview.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthenticationV1beta1SelfSubjectReviewStatus.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthorizationV1LocalSubjectAccessReview.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthorizationV1NonResourceAttributes.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiAuthorizationV1NonResourceRule.CustomTypeAdapterFactory());
@@ -1149,7 +1139,6 @@ public class Generator {
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1CephFSVolumeSource.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1CinderPersistentVolumeSource.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1CinderVolumeSource.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ClaimSource.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ClientIPConfig.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ComponentCondition.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiCoreV1ComponentStatus.CustomTypeAdapterFactory());
@@ -1341,50 +1330,6 @@ public class Generator {
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiEventsV1Event.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiEventsV1EventList.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiEventsV1EventSeries.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2FlowDistinguisherMethod.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2FlowSchema.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2FlowSchemaCondition.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2FlowSchemaList.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2FlowSchemaSpec.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2FlowSchemaStatus.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2GroupSubject.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2LimitResponse.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2LimitedPriorityLevelConfiguration.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2NonResourcePolicyRule.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2PolicyRulesWithSubjects.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2PriorityLevelConfiguration.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2PriorityLevelConfigurationCondition.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2PriorityLevelConfigurationList.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2PriorityLevelConfigurationReference.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2PriorityLevelConfigurationSpec.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2PriorityLevelConfigurationStatus.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2QueuingConfiguration.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2ResourcePolicyRule.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2ServiceAccountSubject.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2Subject.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta2UserSubject.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3FlowDistinguisherMethod.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3FlowSchema.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3FlowSchemaCondition.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3FlowSchemaList.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3FlowSchemaSpec.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3FlowSchemaStatus.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3GroupSubject.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3LimitResponse.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3LimitedPriorityLevelConfiguration.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3NonResourcePolicyRule.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3PolicyRulesWithSubjects.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3PriorityLevelConfiguration.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3PriorityLevelConfigurationCondition.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3PriorityLevelConfigurationList.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3PriorityLevelConfigurationReference.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3PriorityLevelConfigurationSpec.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3PriorityLevelConfigurationStatus.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3QueuingConfiguration.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3ResourcePolicyRule.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3ServiceAccountSubject.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3Subject.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiFlowcontrolV1beta3UserSubject.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1HTTPIngressPath.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1HTTPIngressRuleValue.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1IPBlock.CustomTypeAdapterFactory());
@@ -1410,15 +1355,7 @@ public class Generator {
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1NetworkPolicyPeer.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1NetworkPolicyPort.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1NetworkPolicySpec.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1NetworkPolicyStatus.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1ServiceBackendPort.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1alpha1ClusterCIDR.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1alpha1ClusterCIDRList.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1alpha1ClusterCIDRSpec.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1alpha1IPAddress.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1alpha1IPAddressList.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1alpha1IPAddressSpec.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNetworkingV1alpha1ParentReference.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNodeV1Overhead.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNodeV1RuntimeClass.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiNodeV1RuntimeClassList.CustomTypeAdapterFactory());
@@ -1440,25 +1377,6 @@ public class Generator {
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiRbacV1RoleList.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiRbacV1RoleRef.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiRbacV1Subject.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2AllocationResult.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2PodSchedulingContext.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2PodSchedulingContextList.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2PodSchedulingContextSpec.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2PodSchedulingContextStatus.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClaim.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClaimConsumerReference.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClaimList.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClaimParametersReference.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClaimSchedulingStatus.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClaimSpec.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClaimStatus.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClaimTemplate.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClaimTemplateList.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClaimTemplateSpec.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClass.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClassList.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceClassParametersReference.CustomTypeAdapterFactory());
-            gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiResourceV1alpha2ResourceHandle.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiSchedulingV1PriorityClass.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiSchedulingV1PriorityClassList.CustomTypeAdapterFactory());
             gsonBuilder.registerTypeAdapterFactory(new io.k8s.obj.IoK8sApiStorageV1CSIDriver.CustomTypeAdapterFactory());
