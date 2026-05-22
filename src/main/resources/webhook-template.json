@@ -1,0 +1,248 @@
+{
+  "apiVersion": "admissionregistration.k8s.io/v1",
+  "kind": "ValidatingWebhookConfiguration",
+  "metadata": {
+    "name": "openunison-workflow-validation-RELEASE_NAME",
+    "labels": {
+      "app.kubernetes.io/name": "openunison",
+      "app.kubernetes.io/instance": "openunison-RELEASE_NAME",
+      "app.kubernetes.io/component": "webhooks",
+      "app.kubernetes.io/part-of": "openunison",
+      "app.kubernetes.io/managed-by": "openunison-operator"
+    },
+    "annotations": {
+        "openunison.tremolo.io/owner-kind": "OpenUnison",
+        "openunison.tremolo.io/owner-name": "OBJ_NAME",
+        "openunison.tremolo.io/owner-namespace": "RELEASE_NAMESPACE",
+        "openunison.tremolo.io/owner-uid": "OBJ_UID"
+
+    }
+  },
+  "webhooks": [
+    {
+      "name": "workflows-openunison.tremolo.io",
+      "rules": [
+        {
+          "apiGroups": [
+            "openunison.tremolo.io"
+          ],
+          "apiVersions": [
+            "v1"
+          ],
+          "operations": [
+            "CREATE",
+            "UPDATE"
+          ],
+          "resources": [
+            "workflows"
+          ],
+          "scope": "Namespaced"
+        }
+      ],
+      "namespaceSelector": {
+        "matchExpressions": [
+          {
+            "key": "kubernetes.io/metadata.name",
+            "operator": "In",
+            "values": [
+              "RELEASE_NAMESPACE"
+            ]
+          }
+        ]
+      },
+      "clientConfig": {
+        "service": {
+          "namespace": "RELEASE_NAMESPACE",
+          "name": "openunison-RELEASE_NAME",
+          "path": "/k8s/webhooks/v1/workflows"
+        },
+        "caBundle": "B64_CERT"
+      },
+      "admissionReviewVersions": [
+        "v1"
+      ],
+      "sideEffects": "None",
+      "timeoutSeconds": 30
+    },
+    {
+      "name": "customazs-openunison.tremolo.io",
+      "rules": [
+        {
+          "apiGroups": [
+            "openunison.tremolo.io"
+          ],
+          "apiVersions": [
+            "v1"
+          ],
+          "operations": [
+            "CREATE",
+            "UPDATE"
+          ],
+          "resources": [
+            "customazs"
+          ],
+          "scope": "Namespaced"
+        }
+      ],
+      "namespaceSelector": {
+        "matchExpressions": [
+          {
+            "key": "kubernetes.io/metadata.name",
+            "operator": "In",
+            "values": [
+              "RELEASE_NAMESPACE"
+            ]
+          }
+        ]
+      },
+      "clientConfig": {
+        "service": {
+          "namespace":  "RELEASE_NAMESPACE",
+          "name": "openunison-RELEASE_NAME",
+          "path": "/k8s/webhooks/v1/customazs"
+        },
+        "caBundle": "B64_CERT"
+      },
+      "admissionReviewVersions": [
+        "v1"
+      ],
+      "sideEffects": "None",
+      "timeoutSeconds": 30
+    },
+    {
+      "name": "authmechs-openunison.tremolo.io",
+      "rules": [
+        {
+          "apiGroups": [
+            "openunison.tremolo.io"
+          ],
+          "apiVersions": [
+            "v1"
+          ],
+          "operations": [
+            "CREATE",
+            "UPDATE"
+          ],
+          "resources": [
+            "authmechs"
+          ],
+          "scope": "Namespaced"
+        }
+      ],
+      "namespaceSelector": {
+        "matchExpressions": [
+          {
+            "key": "kubernetes.io/metadata.name",
+            "operator": "In",
+            "values": [
+              "RELEASE_NAMESPACE"
+            ]
+          }
+        ]
+      },
+      "clientConfig": {
+        "service": {
+          "namespace":  "RELEASE_NAMESPACE",
+          "name": "openunison-RELEASE_NAME",
+          "path": "/k8s/webhooks/v1/authmechs"
+        },
+        "caBundle": "B64_CERT"
+      },
+      "admissionReviewVersions": [
+        "v1"
+      ],
+      "sideEffects": "None",
+      "timeoutSeconds": 30
+    },
+    {
+      "name": "authchains-openunison.tremolo.io",
+      "rules": [
+        {
+          "apiGroups": [
+            "openunison.tremolo.io"
+          ],
+          "apiVersions": [
+            "v1"
+          ],
+          "operations": [
+            "CREATE",
+            "UPDATE"
+          ],
+          "resources": [
+            "authchains"
+          ],
+          "scope": "Namespaced"
+        }
+      ],
+      "namespaceSelector": {
+        "matchExpressions": [
+          {
+            "key": "kubernetes.io/metadata.name",
+            "operator": "In",
+            "values": [
+              "RELEASE_NAMESPACE"
+            ]
+          }
+        ]
+      },
+      "clientConfig": {
+        "service": {
+          "namespace":  "RELEASE_NAMESPACE",
+          "name": "openunison-RELEASE_NAME",
+          "path": "/k8s/webhooks/v1/authchains"
+        },
+        "caBundle": "B64_CERT"
+      },
+      "admissionReviewVersions": [
+        "v1"
+      ],
+      "sideEffects": "None",
+      "timeoutSeconds": 30
+    },
+    {
+      "name": "applications-openunison.tremolo.io",
+      "rules": [
+        {
+          "apiGroups": [
+            "openunison.tremolo.io"
+          ],
+          "apiVersions": [
+            "v1"
+          ],
+          "operations": [
+            "CREATE",
+            "UPDATE"
+          ],
+          "resources": [
+            "applications"
+          ],
+          "scope": "Namespaced"
+        }
+      ],
+      "namespaceSelector": {
+        "matchExpressions": [
+          {
+            "key": "kubernetes.io/metadata.name",
+            "operator": "In",
+            "values": [
+              "RELEASE_NAMESPACE"
+            ]
+          }
+        ]
+      },
+      "clientConfig": {
+        "service": {
+          "namespace":  "RELEASE_NAMESPACE",
+          "name": "openunison-RELEASE_NAME",
+          "path": "/k8s/webhooks/v1/applications"
+        },
+        "caBundle": "B64_CERT"
+      },
+      "admissionReviewVersions": [
+        "v1"
+      ],
+      "sideEffects": "None",
+      "timeoutSeconds": 30
+    }
+  ]
+}

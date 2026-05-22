@@ -2,7 +2,9 @@ package com.tremolosecurity.openunison.secret;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.tremolosecurity.openunison.crd.OpenUnison;
 import com.tremolosecurity.openunison.kubernetes.ClusterConnection;
 
 
@@ -33,7 +35,7 @@ public class SecretVersionManager {
         this.cluster = cluster;
     }
 
-    public void onSecret(String namespace, String name, String alias,String updateUrl) {
+    public void onSecret(String namespace, String name, String alias,String updateUrl,OpenUnison ou) {
 
         System.out.println("********** namespace:" + namespace +
                 " / name:" + name +
@@ -44,9 +46,9 @@ public class SecretVersionManager {
             JsonNode existing = getSecretVersion(namespace, name);
 
             if (existing == null) {
-                createSecretVersion(namespace, name, alias,updateUrl);
+                createSecretVersion(namespace, name, alias,updateUrl,ou);
             } else {
-                incrementSecretVersion(namespace, name, existing,updateUrl);
+                incrementSecretVersion(namespace, name, existing,updateUrl,ou);
             }
 
         } catch (Exception e) {
@@ -113,7 +115,7 @@ public class SecretVersionManager {
                 .build();
     }
 
-    private void createSecretVersion(String namespace, String name, String alias, String updateUrl) throws Exception {
+    private void createSecretVersion(String namespace, String name, String alias, String updateUrl,OpenUnison ou) throws Exception {
 
         ObjectNode root = mapper.createObjectNode();
 
@@ -124,9 +126,23 @@ public class SecretVersionManager {
         metadata.put("name", name);
         metadata.put("namespace", namespace);
 
+        ArrayNode ownerRefs = mapper.createArrayNode();
+        ObjectNode ownerRef = mapper.createObjectNode();
+        ownerRefs.add(ownerRef);
+        metadata.set("ownerReferences",ownerRefs);
+        ownerRef.put("apiVersion",ou.getApiVersion());
+        ownerRef.put("kind","OpenUnison");
+        ownerRef.put("name",ou.getMetadata().getName());
+        ownerRef.put("uid",ou.getMetadata().getUid());
+        ownerRef.put("controller",true);
+
+
+
         ObjectNode spec = root.putObject("spec");
         spec.put("key_name", alias);
         spec.put("version", 2);
+
+
 
         String uri = String.format(
                 "%s/apis/openunison.tremolo.io/v1/namespaces/%s/secretversions",
@@ -176,7 +192,7 @@ public class SecretVersionManager {
 
     private void incrementSecretVersion(String namespace,
                                         String name,
-                                        JsonNode existing, String updateUrl) throws Exception {
+                                        JsonNode existing, String updateUrl,OpenUnison ou) throws Exception {
 
         int currentVersion = existing
                 .path("spec")
@@ -196,6 +212,17 @@ public class SecretVersionManager {
 
         ((ObjectNode) updated.path("spec"))
                 .put("version", newVersion);
+
+        ObjectNode metadata = (ObjectNode) updated.get("metadata");
+        ArrayNode ownerRefs = mapper.createArrayNode();
+        ObjectNode ownerRef = mapper.createObjectNode();
+        ownerRefs.add(ownerRef);
+        metadata.set("ownerReferences",ownerRefs);
+        ownerRef.put("apiVersion",ou.getApiVersion());
+        ownerRef.put("kind","OpenUnison");
+        ownerRef.put("name",ou.getMetadata().getName());
+        ownerRef.put("uid",ou.getMetadata().getUid());
+        ownerRef.put("controller",true);
 
         String uri = String.format(
                 "%s/apis/openunison.tremolo.io/v1/namespaces/%s/secretversions/%s",

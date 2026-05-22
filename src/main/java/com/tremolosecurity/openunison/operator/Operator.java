@@ -35,6 +35,7 @@ import com.tremolosecurity.openunison.kubernetes.ClusterConnection;
 import com.tremolosecurity.openunison.obj.WsResponse;
 import com.tremolosecurity.openunison.secret.Generator;
 import com.tremolosecurity.openunison.secret.SecretWatcher;
+import com.tremolosecurity.openunison.webhooks.WebHookManager;
 
 public class Operator {
     ClusterConnection cluster;
@@ -104,7 +105,7 @@ public class Operator {
                             System.out.println("Resource " + resourceVersion + " changed, processing");
                             try {
 
-                                this.processObject(ou, (String) metadata.get("name"));
+                                this.processObject(ou, obj,(String) metadata.get("name"));
                                 succeeded = true;
                             } catch (Throwable t) {
                                 System.out.println("Could not process request:");
@@ -133,7 +134,7 @@ public class Operator {
 
                                 System.out.println("Secret name : " + secretName);
                                 if (this.secretsToWatch != null) {
-                                    secretsToWatch.addSecret(targetNs,secretName,keySpec.getName());
+                                    secretsToWatch.addSecret(targetNs,secretName,keySpec.getName(),ou);
                                 } else {
                                     System.out.println("WARNING: No secret watcher!");
                                 }
@@ -207,7 +208,7 @@ public class Operator {
                             System.out.println("Resource " + resourceVersion + " changed, processing");
                             try {
 
-                                this.processObject(ou, (String) metadata.get("name"));
+                                this.processObject(ou,obj, (String) metadata.get("name"));
                                 succeeded = true;
                             } catch (Throwable t) {
                                 System.out.println("Could not process request:");
@@ -302,11 +303,13 @@ public class Operator {
         this.continueWatch = false;
     }
 
-    private void processObject(com.tremolosecurity.openunison.crd.OpenUnison ou,String name) throws Exception {
+    private void processObject(com.tremolosecurity.openunison.crd.OpenUnison ou,JSONObject ouJson,String name) throws Exception {
         Generator gensecret = new Generator();
         boolean updateAmq = gensecret.load(ou,cluster,cluster.getNamespace(),name,this.admmissionHooks,this.mutationHooks,this.secretsToWatch);
         new Updater(cluster,cluster.getNamespace(),name,updateAmq).rollout();
 
+        WebHookManager whm = new WebHookManager(ouJson,ou,this.cluster,gensecret);
+        whm.onAddOrDelete();
     }
     
 
