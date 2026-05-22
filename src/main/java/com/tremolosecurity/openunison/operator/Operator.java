@@ -237,6 +237,8 @@ public class Operator {
 
                             Generator gensecret = new Generator();
                             gensecret.deleteSecrets(ou,cluster,(String) metadata.get("name"));
+                            WebHookManager whm = new WebHookManager(obj,ou,cluster,gensecret);
+                            whm.onDelete();
                             
                         } catch (Throwable t) {
                             System.out.println("Could not process request:");
@@ -309,7 +311,7 @@ public class Operator {
         new Updater(cluster,cluster.getNamespace(),name,updateAmq).rollout();
 
         WebHookManager whm = new WebHookManager(ouJson,ou,this.cluster,gensecret);
-        whm.onAddOrDelete();
+        whm.onAddOrModify();
     }
     
 
