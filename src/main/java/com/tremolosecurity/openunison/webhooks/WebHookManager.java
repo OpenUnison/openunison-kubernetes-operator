@@ -205,23 +205,23 @@ public class WebHookManager {
             JSONObject root = (JSONObject)o;
             JSONObject metadata = (JSONObject) root.get("metadata");
             String name = (String) metadata.get("name");
-            if (! mutators.contains(name)) {
-                JSONObject annotations = (JSONObject) metadata.get("annotations");
-                String namespace = (String) annotations.get("openunison.tremolo.io/owner-namespace");
-                if (namespace == null) {
-                    namespace = "";
-                }
+            
+            JSONObject annotations = (JSONObject) metadata.get("annotations");
+            String namespace = (String) annotations.get("openunison.tremolo.io/owner-namespace");
+            if (namespace == null) {
+                namespace = "";
+            }
 
-                if (namespace.equalsIgnoreCase(ou.getMetadata().getNamespace())) {
-                    System.out.println("Mutating webhook " + name + " no longer configured, deleting");
-                    resp = k8s.delete("/apis/admissionregistration.k8s.io/v1/mutatingwebhookconfigurations/" + name);
-                    if (resp.getResult() == 200) {
-                        System.out.println("Deleted");
-                    } else {
-                        System.out.println("Could not delete mutator " + resp.getResult() + " / " + resp.getBody());
-                    }
+            if (namespace.equalsIgnoreCase(ou.getMetadata().getNamespace())) {
+                System.out.println("Mutating webhook " + name + " no longer configured, deleting");
+                resp = k8s.delete("/apis/admissionregistration.k8s.io/v1/mutatingwebhookconfigurations/" + name);
+                if (resp.getResult() == 200) {
+                    System.out.println("Deleted");
+                } else {
+                    System.out.println("Could not delete mutator " + resp.getResult() + " / " + resp.getBody());
                 }
             }
+            
         }
 
         resp = k8s.get("/apis/admissionregistration.k8s.io/v1/validatingwebhookconfigurations?labelSelector=app.kubernetes.io%2Fcomponent%3Dconfigured-webhooks%2Capp.kubernetes.io%2Finstance%3Dopenunison-" + ou.getMetadata().getName());
