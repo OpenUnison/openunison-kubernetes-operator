@@ -1,7 +1,10 @@
 package com.tremolosecurity.openunison.secret;
 
+import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -68,6 +71,7 @@ import io.k8s.obj.IoK8sApiAdmissionregistrationV1MutatingWebhookConfiguration;
 import io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhook;
 import io.k8s.obj.IoK8sApiAdmissionregistrationV1ValidatingWebhookConfiguration;
 import io.k8s.obj.IoK8sApimachineryPkgApisMetaV1ObjectMeta;
+import io.k8s.obj.IoK8sApimachineryPkgApisMetaV1OwnerReference;
 import io.k8s.obj.IoK8sApiCoreV1Secret;
 
 public class Generator {
@@ -108,7 +112,7 @@ public class Generator {
         this.generateKeyStore();
         this.generateStaticKeys();
         this.generateOpenUnisonSecret();
-        this.updateValidatingWebhookCertificate();
+        this.updateValidatingWebhookCertificate(ou);
 
 
         this.mutationHooks = mutationHooks;
@@ -147,6 +151,14 @@ public class Generator {
 
 
         io.k8s.obj.IoK8sApiCoreV1Secret secret = new io.k8s.obj.IoK8sApiCoreV1Secret();
+        secret.setMetadata(new IoK8sApimachineryPkgApisMetaV1ObjectMeta());
+        secret.getMetadata().addOwnerReferencesItem(new IoK8sApimachineryPkgApisMetaV1OwnerReference()
+                    .apiVersion(ou.getApiVersion())
+                    .kind(ou.getKind())
+                    .name(ou.getMetadata().getName())
+                    .uid(ou.getMetadata().getUid())
+                    .controller(true)
+                );
         secret.setData(new HashMap<String,byte[]>());
 
         
@@ -184,7 +196,13 @@ public class Generator {
             secret.getMetadata().setNamespace(this.namespace);
             secret.getMetadata().setAnnotations(new HashMap<String,String>());
             secret.getMetadata().getAnnotations().put("tremolo.io/last_updated",new DateTime().toString());
-
+            secret.getMetadata().addOwnerReferencesItem(new IoK8sApimachineryPkgApisMetaV1OwnerReference()
+                    .apiVersion(ou.getApiVersion())
+                    .kind(ou.getKind())
+                    .name(ou.getMetadata().getName())
+                    .uid(ou.getMetadata().getUid())
+                    .controller(true)
+                );
             
 
             resp = cluster.post("/api/v1/namespaces/" + namespace + "/secrets", secret.toJson());
@@ -318,6 +336,13 @@ public class Generator {
                 secret.getMetadata().setNamespace(this.namespace);
                 secret.getMetadata().setAnnotations(new HashMap<String,String>());
                 secret.getMetadata().getAnnotations().put("tremolo.io/last_updated",new DateTime().toString());
+                secret.getMetadata().addOwnerReferencesItem(new IoK8sApimachineryPkgApisMetaV1OwnerReference()
+                    .apiVersion(ou.getApiVersion())
+                    .kind(ou.getKind())
+                    .name(ou.getMetadata().getName())
+                    .uid(ou.getMetadata().getUid())
+                    .controller(true)
+                );
                 secret.setData(dataPatch);
 
                 resp = cluster.post( "/api/v1/namespaces/" + this.namespace + "/secrets", secret.toJson());
@@ -331,7 +356,15 @@ public class Generator {
                 secret.setMetadata(new IoK8sApimachineryPkgApisMetaV1ObjectMeta());
                 secret.getMetadata().setAnnotations(new HashMap<String,String>());
                 secret.getMetadata().getAnnotations().put("tremolo.io/last_updated",new DateTime().toString());
+                secret.getMetadata().addOwnerReferencesItem(new IoK8sApimachineryPkgApisMetaV1OwnerReference()
+                    .apiVersion(ou.getApiVersion())
+                    .kind(ou.getKind())
+                    .name(ou.getMetadata().getName())
+                    .uid(ou.getMetadata().getUid())
+                    .controller(true)
+                );
                 secret.setData(dataPatch);
+
 
                 String tmpJson = secret.toJson();
                 JSONObject secretObj = (JSONObject) new JSONParser().parse(tmpJson);
@@ -465,7 +498,7 @@ public class Generator {
 
         System.out.println("Secret name : " + secretName);
         if (this.secretWatcher != null) {
-            this.secretWatcher.addSecret(targetNs,secretName,keySpec.getName());
+            this.secretWatcher.addSecret(targetNs,secretName,keySpec.getName(),ou);
         } else {
             System.out.println("WARNING: no secret watcher");
         }
@@ -565,6 +598,7 @@ public class Generator {
         secretToCreate.put("metadata",metadata);
         metadata.put("name", secretName);
         metadata.put("namespace",targetNs);
+        metadata.put("ownerReferences",generateOwnerReferences(ou));
         JSONObject labels = new JSONObject();
         metadata.put("labels",labels);
         labels.put("tremolo_operator_created", "true");
@@ -620,6 +654,18 @@ public class Generator {
     
     }
 
+    private JSONArray generateOwnerReferences(OpenUnison ou2) {
+        JSONObject owner = new JSONObject();
+        owner.put("apiVersion",ou.getApiVersion());
+        owner.put("kind",ou.getKind());
+        owner.put("name",ou.getMetadata().getName());
+        owner.put("uid",ou.getMetadata().getUid());
+        owner.put("controller",true);
+        JSONArray refs = new JSONArray();
+        refs.add(owner);
+        return refs;
+    }
+
     private String asYaml(String jsonString) throws JsonProcessingException, IOException {
         // parse JSON
         JsonNode jsonNodeTree = new ObjectMapper().readTree(jsonString);
@@ -629,8 +675,63 @@ public class Generator {
     }
 
 
-    private void updateValidatingWebhookCertificate() throws Exception {
+    private void updateValidatingWebhookCertificate(OpenUnison ou) throws Exception {
+        this.createInitialValidatingWebhook("openunison-workflow-validation-" + this.name,ou);
         this.updateValidatingWebhookCertificate("openunison-workflow-validation-" + this.name);
+    }
+
+
+    private void createInitialValidatingWebhook(String whname,OpenUnison ou) throws Exception {
+        String whUriNs = "/apis/admissionregistration.k8s.io/v1/validatingwebhookconfigurations/"+ whname;
+        
+        System.out.println("Starting webhook check, looking up " + whUriNs);
+        WsResponse resp = cluster.get(whUriNs);
+
+        if (resp.getResult() != 404) {
+            System.out.println("OpenUnison Validating Webhook exists, doesn't need to be created");
+            return;
+        } else {
+            System.out.println("OpenUnison Validating Webhook does not exist, creating");
+        }
+
+        java.security.cert.Certificate unisonCert = this.ouKs.getCertificate("unison-tls");
+
+        if (unisonCert == null) {
+            System.out.println("unison-tls certificate does not exist, not attempting any updates");
+            return;
+        }
+
+        
+
+        String unisonTlsPem = CertUtils.exportCert((X509Certificate) unisonCert);
+        byte[] unisonCertBytes = unisonTlsPem.getBytes("UTF-8");
+
+        String b64Tls = Base64.getEncoder().encodeToString(unisonCertBytes);
+
+        ClassLoader classloader = Thread.currentThread().getContextClassLoader();
+        InputStream is = classloader.getResourceAsStream("webhook-template.json");
+        BufferedReader in = new BufferedReader(new InputStreamReader(is));
+        StringBuilder template = new StringBuilder();
+        String line = null;
+        while ((line = in.readLine()) != null) {
+            template.append(line).append('\n');
+        }
+
+        String json = template.toString();
+        json = json.replaceAll("RELEASE_NAMESPACE",this.namespace)
+                   .replaceAll("RELEASE_NAME",this.name)
+                   .replaceAll("B64_CERT",b64Tls)
+                   .replaceAll("API_VERSION",ou.getApiVersion())
+                   .replaceAll("OBJ_NAME",ou.getMetadata().getName())
+                   .replaceAll("OBJ_UID",ou.getMetadata().getUid());
+
+        resp = cluster.post("/apis/admissionregistration.k8s.io/v1/validatingwebhookconfigurations",json);
+        if (resp.getResult() != 201) {
+            System.out.println("Unable to create the validating webhooks: " + resp.getResult() + " / " + resp.getBody().toJSONString());
+        } else {
+            System.out.println("Validating webhook created");
+        }
+        
     }
 
     private void updateValidatingWebhookCertificate(String whname) throws Exception {
@@ -819,6 +920,13 @@ public class Generator {
                 System.out.println("No changes to AMQ secret");
             } else {
                 IoK8sApiCoreV1Secret patch = new IoK8sApiCoreV1Secret();
+                patch.getMetadata().addOwnerReferencesItem(new IoK8sApimachineryPkgApisMetaV1OwnerReference()
+                    .apiVersion(ou.getApiVersion())
+                    .kind(ou.getKind())
+                    .name(ou.getMetadata().getName())
+                    .uid(ou.getMetadata().getUid())
+                    .controller(true)
+                );
                 patch.setData(new HashMap<String,byte[]>());
                 patch.getData().put("amq.p12", CertUtils.encodeKeyStoreToBytes(amqKS, ksPassword));
                 res = cluster.patch(amqSecretUri, patch.toJson());
@@ -846,6 +954,13 @@ public class Generator {
                 new IoK8sApimachineryPkgApisMetaV1ObjectMeta()
                 .name("amq-secrets-" + this.name)
                 .namespace(this.namespace)
+                .addOwnerReferencesItem(new IoK8sApimachineryPkgApisMetaV1OwnerReference()
+                    .apiVersion(ou.getApiVersion())
+                    .kind(ou.getKind())
+                    .name(ou.getMetadata().getName())
+                    .uid(ou.getMetadata().getUid())
+                    .controller(true)
+                )
             )
             .kind("Secret")
             .type("Opaque")
@@ -884,7 +999,13 @@ public class Generator {
         .data(new HashMap<String,byte[]>());    
 
         amqEnvSecret.getMetadata().getAnnotations().put("tremolo.io/digest",newCfgDigest);
-
+        amqEnvSecret.getMetadata().addOwnerReferencesItem(new IoK8sApimachineryPkgApisMetaV1OwnerReference()
+                    .apiVersion(ou.getApiVersion())
+                    .kind(ou.getKind())
+                    .name(ou.getMetadata().getName())
+                    .uid(ou.getMetadata().getUid())
+                    .controller(true)
+                );
         amqEnvSecret.getData().put("JDBC_DRIVER", this.props.get("OU_JDBC_DRIVER").getBytes("UTF-8"));
         amqEnvSecret.getData().put("JDBC_URL", this.props.get("OU_JDBC_URL").getBytes("UTF-8"));
         amqEnvSecret.getData().put("JDBC_USER", this.props.get("OU_JDBC_USER").getBytes("UTF-8"));
@@ -933,6 +1054,13 @@ public class Generator {
         this.name = name;
         this.loadPropertiesFromCrd();
         String ksPassword = this.props.get("unisonKeystorePassword");
+
+
+        // delete the validating webhook
+        String whUriNs = "/apis/admissionregistration.k8s.io/v1/validatingwebhookconfigurations/openunison-workflow-validation-" + this.name;
+        WsResponse resp = cluster.delete(whUriNs);
+        System.out.println("Delete webhook response " + resp.getResult() + " / " + resp.getBody().toString());
+
         boolean skipWriteToSecret = this.props.get("openunison.static-secret.skip_write") != null && this.props.get("openunison.static-secret.skip_write").equals("true");
         String secretSuffix = this.props.get("openunison.static-secret.suffix");
 
@@ -979,6 +1107,8 @@ public class Generator {
 
             }
         }
+
+        
     }
 
 
@@ -1446,6 +1576,23 @@ public class Generator {
             io.k8s.JSON.setGson(gsonBuilder.create());
         
     
+    }
+
+    public String getInternalCaBundle() throws Exception {
+        java.security.cert.Certificate unisonCert = this.ouKs.getCertificate("unison-tls");
+
+        if (unisonCert == null) {
+            System.out.println("unison-tls certificate does not exist, not attempting any updates");
+            return "";
+        }
+
+        
+
+        String unisonTlsPem = CertUtils.exportCert((X509Certificate) unisonCert);
+        byte[] unisonCertBytes = unisonTlsPem.getBytes("UTF-8");
+
+        String b64Tls = Base64.getEncoder().encodeToString(unisonCertBytes);
+        return b64Tls;
     }
     
     

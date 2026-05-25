@@ -2,6 +2,7 @@ package com.tremolosecurity.openunison.secret;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tremolosecurity.openunison.crd.OpenUnison;
 import com.tremolosecurity.openunison.kubernetes.ClusterConnection;
 
 import java.io.InputStream;
@@ -50,8 +51,8 @@ public class SecretWatcher {
     /**
      * Add a single secret to watch. Namespace watcher is started if needed.
      */
-    public void addSecret(String namespace, String secretName, String alias) {
-        SecretToWatch secret = new SecretToWatch(secretName,alias);
+    public void addSecret(String namespace, String secretName, String alias,OpenUnison ou) {
+        SecretToWatch secret = new SecretToWatch(secretName,alias,ou);
 
         Map<String,SecretToWatch> nsWatches = watchedSecrets.get(namespace);
 
@@ -198,7 +199,7 @@ public class SecretWatcher {
                 if (nsSecrets != null) {
                     SecretToWatch secret = nsSecrets.get(name);
                     if (secret != null) {
-                        this.onSecret(namespace,secret.getName(),secret.getAlias(),updateUrl);
+                        this.onSecret(namespace,secret.getName(),secret.getAlias(),updateUrl,secret.getOpenUnison());
                     }
                 }
                 
@@ -257,8 +258,8 @@ public class SecretWatcher {
     }
 
 
-    public void onSecret(String namespace, String name, String alias, String updateUrl) {
-        svm.onSecret(namespace,name,alias,updateUrl);
+    public void onSecret(String namespace, String name, String alias, String updateUrl,OpenUnison ou) {
+        svm.onSecret(namespace,name,alias,updateUrl,ou);
     }
 
     /**
@@ -273,16 +274,18 @@ public class SecretWatcher {
 class SecretToWatch {
     String name;
     String alias;
+    OpenUnison ou;
     
 
-    public SecretToWatch(String name) {
+    public SecretToWatch(String name,OpenUnison ou) {
         this.name = name;
-    
+        this.ou = ou;
     }
 
-    public SecretToWatch(String name,String alias) {
+    public SecretToWatch(String name,String alias,OpenUnison ou) {
         this.name = name;
         this.alias = alias;
+        this.ou = ou;
     
     }
 
@@ -294,6 +297,9 @@ class SecretToWatch {
         return this.alias;
     }
 
+    public OpenUnison getOpenUnison() {
+        return ou;
+    }
 
 
     @Override
