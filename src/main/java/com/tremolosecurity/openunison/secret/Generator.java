@@ -598,7 +598,11 @@ public class Generator {
         secretToCreate.put("metadata",metadata);
         metadata.put("name", secretName);
         metadata.put("namespace",targetNs);
-        metadata.put("ownerReferences",generateOwnerReferences(ou));
+
+        // only add ownerRef for secrets that are in the current namespace
+        if (targetNs.equals(this.namespace)) {
+            metadata.put("ownerReferences",generateOwnerReferences(ou));
+        }
         JSONObject labels = new JSONObject();
         metadata.put("labels",labels);
         labels.put("tremolo_operator_created", "true");
@@ -618,7 +622,9 @@ public class Generator {
         }
 
         System.out.println("Creating new Secret");
-        this.cluster.post("/api/v1/namespaces/" + targetNs + "/secrets",secretToCreate.toString());
+        WsResponse res = this.cluster.post("/api/v1/namespaces/" + targetNs + "/secrets",secretToCreate.toString());
+        
+        
 
         if (keySpec.getCreateData().getDeletePodsLabels() != null && ! keySpec.getCreateData().getDeletePodsLabels().isEmpty()) {
             boolean first = true;
