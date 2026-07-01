@@ -79,7 +79,32 @@ public class Updater {
                     System.out.println("Patched " + deploymentURI);
                 }
 
-            }   
+            }
+            
+            deploymentURI = "/apis/apps/v1/namespaces/" + this.namespace + "/deployments/amq-" + this.name + "-backup";
+            resp = this.cluster.get(deploymentURI);
+            if (resp.getResult() != 200) {
+                throw new Exception("Could not load " + deploymentURI + " / " + resp.getResult() + " / " + resp.getBody().toString());
+            } else {
+                io.k8s.obj.IoK8sApiAppsV1Deployment deployment = io.k8s.JSON.getGson().fromJson(resp.getBody().toJSONString(), io.k8s.obj.IoK8sApiAppsV1Deployment.class);
+                io.k8s.obj.IoK8sApiAppsV1Deployment patch = new io.k8s.obj.IoK8sApiAppsV1Deployment();
+                patch.setMetadata(new IoK8sApimachineryPkgApisMetaV1ObjectMeta());
+                patch.setSpec(deployment.getSpec());
+
+                if (patch.getSpec().getTemplate().getMetadata().getAnnotations() == null) {
+                    patch.getSpec().getTemplate().getMetadata().setAnnotations(new HashMap<String,String>());
+                }
+
+                patch.getSpec().getTemplate().getMetadata().getAnnotations().put("tremolo.io/update", new DateTime().toString());
+                
+                resp = this.cluster.patch(deploymentURI, patch.toJson());
+                if (resp.getResult() < 200 || resp.getResult() > 299) {
+                    throw new Exception("Could not patch " + deploymentURI + " / " + resp.getResult() + " / " + resp.getBody().toString());
+                } else {
+                    System.out.println("Patched " + deploymentURI);
+                }
+
+            }
         }
 
 

@@ -2,12 +2,14 @@ FROM ubuntu:24.04
 
 MAINTAINER Tremolo Security, Inc. - Docker <docker@tremolosecurity.com>
 
-RUN apt-get update;apt-get -y install openjdk-21-jre-headless curl apt-transport-https gnupg && \
+RUN apt-get update;apt-get -y install openjdk-21-jre-headless curl apt-transport-https gnupg ; apt-get upgrade -y && \
     curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - && \
     groupadd -r ouoperator -g 433 && \
     mkdir /usr/local/ouoperator && \
     useradd -u 431 -r -g ouoperator -d /usr/local/ouoperator -s /sbin/nologin -c "OpenUnison Operator Docker image user" ouoperator && \
-    chown -R ouoperator:ouoperator /usr/local/ouoperator 
+    chown -R ouoperator:ouoperator /usr/local/ouoperator && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 ADD target/operator-*.jar /usr/local/ouoperator/ouoperator.jar
 
