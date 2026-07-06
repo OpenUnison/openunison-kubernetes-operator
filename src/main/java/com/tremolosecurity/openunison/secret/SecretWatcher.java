@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tremolosecurity.openunison.crd.OpenUnison;
 import com.tremolosecurity.openunison.kubernetes.ClusterConnection;
+import com.tremolosecurity.openunison.util.K8sResourceVersionParser;
 
 import java.io.InputStream;
 import java.net.URI;
@@ -258,18 +259,20 @@ public class SecretWatcher {
                 .GET()
                 .build();
 
-        HttpResponse<String> response =
-                cluster.getHttp().send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<InputStream> response =
+                cluster.getHttp().send(request, HttpResponse.BodyHandlers.ofInputStream());
 
         if (response.statusCode() != 200) {
             throw new RuntimeException("Failed to list secrets: HTTP "
                     + response.statusCode());
         }
 
-        JsonNode root = mapper.readTree(response.body());
-        return root.path("metadata")
-                .path("resourceVersion")
-                .asText();
+        try (InputStream in = response.body()) {
+            String resourceVersion =
+                K8sResourceVersionParser.parseListResourceVersion(in);
+
+            return resourceVersion;
+        }
     }
 
 
