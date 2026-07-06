@@ -21,6 +21,7 @@ public class K8sResourceVersionParser {
 
                 if (token == JsonToken.FIELD_NAME) {
                     currentField = parser.currentName();
+                    System.out.println("##### fieldname: " + currentField);
 
                     if ("metadata".equals(currentField)) {
                         JsonToken next = parser.nextToken();
