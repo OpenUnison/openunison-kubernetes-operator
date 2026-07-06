@@ -183,6 +183,13 @@ public class SecretWatcher {
                 JsonNode obj = root.path("object");
 
                 String name = obj.path("metadata").path("name").asText();
+                String secretType = obj.path("type").asText();
+
+                // make sure we don't bother interpreting anything except TLS secrets
+                if (secretType == null || ! secretType.equalsIgnoreCase("kubernetes.io/tls")) {
+                    // not a TLS secret, do nothing
+                    return;
+                }
 
                 String updateUrl = "";
                 if (obj.path("metadata").path("annotations") != null && obj.path("metadata").path("annotations").path("tremolo.io/update-webhook") != null) {
@@ -212,6 +219,14 @@ public class SecretWatcher {
 
             case "DELETED" -> {
                 JsonNode obj = root.path("object");
+
+                String secretType = obj.path("type").asText();
+                // make sure we don't bother interpreting anything except TLS secrets
+                if (secretType == null || ! secretType.equalsIgnoreCase("kubernetes.io/tls")) {
+                    // not a TLS secret, do nothing
+                    return;
+                }
+
                 String rv = obj.path("metadata")
                         .path("resourceVersion").asText();
 
