@@ -504,3 +504,5 @@ Automatic Update - 20261023T020437.783Z
 Automatic Update - 20261029T020446.846Z
 Automatic Update - 20261106T020443.103Z
 Automatic Update - 20261114T020512.246Z
+
+Force rebuild for CVE-2026-114938
